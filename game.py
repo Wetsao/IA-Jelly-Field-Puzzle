@@ -2,6 +2,46 @@ from collections import deque
 
 
 
+import copy
+
+class Solver:
+    def __init__(self, game):
+        self.game = game
+        self.best_moves = []
+        self.number_moves = float('+inf')
+    
+    def dfs(self, game_state, move_sequence, depth):
+        if depth == 0 or game_state.is_goal_met():
+            if len(move_sequence)<self.number_moves:
+                self.number_moves = len(move_sequence)
+                self.best_moves = move_sequence[:]
+            return
+        
+        for row in range(game_state.board.rows):
+            for col in range(game_state.board.cols):
+                for hand_index in range(len(game_state.hand.pieces)):
+                    new_game_state = copy.deepcopy(game_state)
+                    piece = new_game_state.hand.get_piece(hand_index)
+                    if piece:
+                        try:
+                            new_game_state.board.place_piece(row, col, piece)
+                            new_game_state.board.pop_clusters()
+                            new_game_state.refill_hand()
+                            move_sequence.append((row, col, hand_index))
+                            self.dfs(new_game_state, move_sequence, depth - 1)
+                            move_sequence.pop()
+                        except (IndexError, ValueError):
+                            continue  # Ignore invalid moves
+    
+    def find_best_moves(self, max_depth=3):
+        self.dfs(self.game, [], max_depth)
+        return self.best_moves
+
+    #def find_best_moves(self)
+
+
+
+
 
 class Color:
     BLUE = "B"
@@ -290,7 +330,9 @@ class Queue:
     # Remove e retorna a próxima peça da fila
     def draw_piece(self):
         if self.pieces:
-            return self.pieces.popleft()
+            self.piece = self.pieces.popleft()
+            self.pieces.append(self.piece)
+            return self.piece
         else:
             return None
 
@@ -319,6 +361,14 @@ class Game:
         self.queue = queue
         self.refill_hand()
 
+    def make_board(self):
+        self.board.place_piece(0,0,self.queue.draw_piece())
+        self.board.place_piece(0,2,self.queue.draw_piece())
+        self.board.place_piece(1,1,self.queue.draw_piece())
+        self.board.place_piece(2,0,self.queue.draw_piece())
+        self.board.place_piece(2,2,self.queue.draw_piece())
+        self.board.place_piece(2,1,self.queue.draw_piece())
+
     # Preenche a mão com peças da fila
     def refill_hand(self):
         while len(self.hand.pieces) < self.hand.max_pieces:
@@ -333,7 +383,7 @@ class Game:
         piece = self.hand.get_piece(hand_index)
         if piece:
             self.board.place_piece(row, col, piece)
-            self.board.pop_clusters()
+            #self.board.pop_clusters()
             self.refill_hand()
         else:
             print("Invalid piece index or no more pieces in hand.")
@@ -360,34 +410,51 @@ class Game:
 
 # Example usage
 pieces = [
-    #Piece(Color.BLUE, Color.RED, Color.BLUE, Color.BLUE),
-    Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
-    Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
-    Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
-    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
-    Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
-    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
-    Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
-    Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    # #Piece(Color.BLUE, Color.RED, Color.BLUE, Color.BLUE),
+    # Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
+    # Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
+    # Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
+    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
+    # Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
+    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
+    # Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
+    # Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
 ]
 
-goal = Goal(blue=20, green=20, red=20, yellow=20)
-hand = Hand(max_pieces=2)
+goal = Goal(blue=0, green=8, red=8, yellow=0)
+hand = Hand(max_pieces=1)
 queue = Queue(pieces)
 game = Game(3, 3, goal, hand, queue)
 
+
 # Place pieces on the board
-game.place_piece(0, 0, 0)  
-game.place_piece(0, 1, 1)  
-game.place_piece(1, 0, 1)  
+game.make_board()
 
 
 
 
 # PARA VER O TABULEIRO ANTES E DEPOIS DO POP, COMENTAR LINHA 336 E DESCOMENTAR AS LINHAS SEGUINTES:
-#print("Before popping:")
-#print(game)
-#game.board.pop_clusters()
+print("Before popping:")
+print(game)
+game.board.pop_clusters()
+
+
 
 print("\nAfter popping clusters:")
 print(game)
+
+
+# Usage example:
+solver = Solver(game)
+best_moves = solver.find_best_moves()
+print("Best Move Sequence:", best_moves)
