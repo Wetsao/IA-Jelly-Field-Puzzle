@@ -36,8 +36,47 @@ class Solver:
     def find_best_moves(self, max_depth=3):
         self.dfs(self.game, [], max_depth)
         return self.best_moves
+    
+    def bfs(self, game):
+        queu = deque()
+        queu.append((game, []))
+        while queu:
+            game, move_sequence = queu.popleft()
+            if(len(move_sequence) == 1):
+                print(move_sequence, game.is_goal_met())
+                print(game)
+            if(game.is_goal_met()):
+                self.best_moves = move_sequence
+                return
+            
+            for move in self.possible_moves(game):  
+                new_game = copy.deepcopy(game)
+                piece = new_game.hand.get_piece(move[2])
+                new_game.board.place_piece(move[0],move[1], piece)
+                new_game.board.pop_clusters()
+                new_game.refill_hand()
+                new_sequence = move_sequence + [move]
+                queu.append((new_game, new_sequence))
 
-    #def find_best_moves(self)
+    def possible_moves(self, game):
+        possible_moves = []
+        for row in range(game.board.rows):
+            for cols in range(game.board.cols):
+                for hand in range(len(game.hand.pieces)):
+                    new_game = copy.deepcopy(game)
+                    piece = new_game.hand.get_piece(hand)
+                    if piece:
+                        try:
+                            new_game.board.place_piece(row, cols, piece)
+                            possible_moves.append((row,cols,hand))
+                        except (IndexError, ValueError):
+                            continue  # Ignore invalid moves
+        return possible_moves
+    
+    def find_best_moves_bfs(self):
+        self.bfs(self.game)
+        return self.best_moves
+
 
 
 
@@ -456,5 +495,8 @@ print(game)
 
 # Usage example:
 solver = Solver(game)
+solver2 = Solver(game)
 best_moves = solver.find_best_moves()
+best_moves_bfs = solver2.find_best_moves_bfs()
 print("Best Move Sequence:", best_moves)
+print("Best moves bfs:", best_moves_bfs)
