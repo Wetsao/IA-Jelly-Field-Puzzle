@@ -1,7 +1,7 @@
 from collections import deque
-
-
-
+import heapq
+import time
+import tracemalloc
 import copy
 
 class Solver:
@@ -9,12 +9,23 @@ class Solver:
         self.game = game
         self.best_moves = []
         self.number_moves = float('+inf')
+
+    # cria um hash com informaçao do state da board(board, hand, goal, queue) para depois comparar se o state ja foi visitado ou nao
+    def hash_game_state(self, game):
+        board_str = str(game.board.grid)  
+        hand_str = str([str(p) for p in game.hand.pieces])
+        goal_str = str(game.goal.goal)
+        queue_str = str([str(p) for p in game.queue.pieces]) 
+        return hash(board_str + hand_str + goal_str + queue_str)
     
     def dfs(self, game_state, move_sequence, depth):
         if depth == 0 or game_state.is_goal_met():
             if len(move_sequence)<self.number_moves:
                 self.number_moves = len(move_sequence)
                 self.best_moves = move_sequence[:]
+                if game_state.is_goal_met() == True:
+                    print("Goal met")
+                    print(self.best_moves)
             return
         
         for row in range(game_state.board.rows):
@@ -31,20 +42,27 @@ class Solver:
                             self.dfs(new_game_state, move_sequence, depth - 1)
                             move_sequence.pop()
                         except (IndexError, ValueError):
-                            continue  # Ignore invalid moves
+                            continue
     
-    def find_best_moves(self, max_depth=3):
+    def find_best_moves(self, max_depth=6):
         self.dfs(self.game, [], max_depth)
         return self.best_moves
     
     def bfs(self, game):
+        visited = set()
         queu = deque()
         queu.append((game, []))
         while queu:
             game, move_sequence = queu.popleft()
-            if(len(move_sequence) == 1):
-                print(move_sequence, game.is_goal_met())
-                print(game)
+            # if(len(move_sequence) == 1):
+            #     print(move_sequence, game.is_goal_met())
+            #     # print(game)
+
+            current_hash = self.hash_game_state(game)
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
             if(game.is_goal_met()):
                 self.best_moves = move_sequence
                 return
@@ -55,8 +73,11 @@ class Solver:
                 new_game.board.place_piece(move[0],move[1], piece)
                 new_game.board.pop_clusters()
                 new_game.refill_hand()
-                new_sequence = move_sequence + [move]
-                queu.append((new_game, new_sequence))
+                
+                state_hash = self.hash_game_state(new_game)
+                if state_hash not in visited:
+                    new_sequence = move_sequence + [move] 
+                    queu.append((new_game, new_sequence))
 
     def possible_moves(self, game):
         possible_moves = []
@@ -70,15 +91,107 @@ class Solver:
                             new_game.board.place_piece(row, cols, piece)
                             possible_moves.append((row,cols,hand))
                         except (IndexError, ValueError):
-                            continue  # Ignore invalid moves
+                            continue 
         return possible_moves
     
     def find_best_moves_bfs(self):
         self.bfs(self.game)
         return self.best_moves
+    
+    def a_star(self):
+        visited = {} 
+        priority_queue = []
+        entry_count = 0
 
+        initial_state = copy.deepcopy(self.game)
+        initial_g = 0
+        initial_h = self.heuristic2(initial_state)
+        heapq.heappush(priority_queue, (initial_g + initial_h, entry_count, initial_state, []))
+        entry_count += 1
 
+        while priority_queue:
+            f, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
 
+            # print(move_sequence, game.is_goal_met())
+            # print(game)
+
+            if current_hash in visited and visited[current_hash] <= f:
+                continue
+            visited[current_hash] = f
+
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece) 
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_g = len(move_sequence) + 1  # Cada move custa 1
+                new_h = self.heuristic2(new_game)
+                new_f = new_g + new_h
+                new_hash = self.hash_game_state(new_game)
+                
+                if new_hash not in visited or new_f < visited.get(new_hash, float('+inf')):
+                    heapq.heappush(priority_queue, (new_f, entry_count, new_game, move_sequence + [move]))  
+                    entry_count += 1
+
+    def greedy(self):
+        visited = set()
+        priority_queue = []
+        entry_count = 0
+        initial_state = copy.deepcopy(self.game)
+        initial_h = self.heuristic1(initial_state)
+        heapq.heappush(priority_queue, (initial_h, entry_count, initial_state, []))
+        entry_count += 1
+
+        while priority_queue:
+            h, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
+
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece)
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_h = self.heuristic1(new_game)
+                new_hash = self.hash_game_state(new_game)
+
+                if new_hash not in visited:
+                    heapq.heappush(priority_queue, (new_h, entry_count, new_game, move_sequence + [move]))
+                    entry_count += 1
+
+    # Heuristica simples calcula soma total do objetivo
+    def heuristic1(self, game):
+        return game.goal.goal_sum() 
+    
+    
+    # Heuristica assume que qualquer move elimina o maximo de cores possiveis
+    def heuristic2(self, game):
+        total_remaining = game.goal.goal_sum()
+        return (total_remaining + 3) // 4  
+
+    
 
 
 
@@ -103,6 +216,11 @@ class Piece:
     # Retorna o número de ocorrências da cor removida
     def pop_color(self, color):
         count = self.colors.count(color)
+        # for quadrant_index in self.colors:
+            # if self.colors[quadrant_index-1] == color and self.colors[quadrant_index+1] == color:
+            #         self.colors[q_index] = Color.NULL
+            #         self.fill_nulls
+
         self.colors = [Color.NULL if c == color else c for c in self.colors]
         self.fill_nulls()
         return count
@@ -144,7 +262,7 @@ class Piece:
 
         if len(valid_neighbors) == 2 and neighbor_counts[valid_neighbors[0]] == neighbor_counts[valid_neighbors[1]]:
             # Se houver um empate, prioriza o vizinho horizontal
-            if index in [0, 2]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
+            if index in [0, 1]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
                 return neighbors[0]
             else:  # Horizontal neighbors for index 1 and 3 are 0 and 2 respectively
                 return neighbors[1]
@@ -175,7 +293,8 @@ class Board:
     def place_piece(self, row, col, piece):
         if 0 <= row < self.rows and 0 <= col < self.cols:
             if self.grid[row][col] is None:
-                self.grid[row][col] = piece
+                new_piece = copy.deepcopy(piece)
+                self.grid[row][col] = new_piece
             else:
                 raise ValueError("Position already occupied")
         else:
@@ -320,6 +439,10 @@ class Goal:
     def is_goal_met(self):
         return all(count == 0 for count in self.goal.values())
 
+    # Retorna numero total do objetivo
+    def goal_sum(self):
+        return sum(self.goal.values())
+
     # Retorna uma representação do objetivo como uma string
     def __str__(self):
         return f"Goal: {self.goal}"
@@ -408,6 +531,8 @@ class Game:
         self.board.place_piece(2,2,self.queue.draw_piece())
         self.board.place_piece(2,1,self.queue.draw_piece())
 
+        
+
     # Preenche a mão com peças da fila
     def refill_hand(self):
         while len(self.hand.pieces) < self.hand.max_pieces:
@@ -422,7 +547,7 @@ class Game:
         piece = self.hand.get_piece(hand_index)
         if piece:
             self.board.place_piece(row, col, piece)
-            #self.board.pop_clusters()
+            self.board.pop_clusters()
             self.refill_hand()
         else:
             print("Invalid piece index or no more pieces in hand.")
@@ -430,7 +555,7 @@ class Game:
     # verifica se o objetivo foi atingido
     def is_goal_met(self):
         return self.goal.is_goal_met()
-
+    
     # Retorna uma representação do jogo como uma string
     def __str__(self):
         return f"{self.board}\n\n{self.goal}\n\n{self.hand}\n\n{self.queue}"
@@ -449,17 +574,13 @@ class Game:
 
 # Example usage
 pieces = [
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    # #Piece(Color.BLUE, Color.RED, Color.BLUE, Color.BLUE),
+    # Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+    # Piece(Color.GREEN, Color.YELLOW, Color.BLUE, Color.GREEN),
+    # Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+    # Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+    # Piece(Color.GREEN, Color.RED, Color.RED, Color.RED),
+    # Piece(Color.RED, Color.RED, Color.RED, Color.RED),    
+
     # Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
     # Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
     # Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
@@ -468,17 +589,32 @@ pieces = [
     # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
     # Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
     # Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
+
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE)
+
+    # Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
 ]
 
-goal = Goal(blue=0, green=8, red=8, yellow=0)
-hand = Hand(max_pieces=1)
+goal = Goal(blue=8, green=8, red=0, yellow=0)
+hand = Hand(max_pieces=2)
 queue = Queue(pieces)
 game = Game(3, 3, goal, hand, queue)
 
 
 # Place pieces on the board
 game.make_board()
-
 
 
 
@@ -492,11 +628,58 @@ game.board.pop_clusters()
 print("\nAfter popping clusters:")
 print(game)
 
+# game.place_piece(0,1,0)
+# print(game)
+# game.place_piece(1,0,0)
+# print(game)
+# game.place_piece(1,2,0)
+# print(game)
+# game.place_piece(1,1,0)
+# print(game)
+# game.place_piece(0,1,0)
+# print(game)
+
+
 
 # Usage example:
 solver = Solver(game)
-solver2 = Solver(game)
-best_moves = solver.find_best_moves()
-best_moves_bfs = solver2.find_best_moves_bfs()
-print("Best Move Sequence:", best_moves)
-print("Best moves bfs:", best_moves_bfs)
+best_moves = []
+
+while True:
+    print("What algorithm do you want to test?")
+    print("1.DFS")
+    print("2.BFS")
+    print("3.A*")
+    print("4.greedy")
+    n_algorithm = input()
+    print("\n")
+
+    if n_algorithm == '1':
+        start = time.time()
+        best_moves = solver.find_best_moves()
+        end = time.time()
+    elif n_algorithm == '2':
+        start = time.time()
+        best_moves = solver.find_best_moves_bfs()
+        end = time.time()
+    elif n_algorithm == '3':
+        start = time.time()
+        best_moves = solver.a_star()
+        end = time.time()
+    elif n_algorithm == '4':
+        start = time.time()
+        best_moves = solver.greedy()
+        end = time.time()
+
+    print("Best Move Sequence:", best_moves)
+
+    if n_algorithm == '1':
+        print("Time DFS:",end - start)
+    elif n_algorithm == '2':
+        print("Time BFS:",end - start)
+    elif n_algorithm == '3':
+        print("Time A*:", end - start)
+    elif n_algorithm == '4':
+        print("Time Greedy:", end - start)
+
+    print("\n")
