@@ -726,8 +726,8 @@ pieces = [
     # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
 ]
 
-goal = Goal(blue=16, green=16, red=0, yellow=0)
-hand = Hand(max_pieces=2)
+goal = Goal(blue=16, green=16, red=16, yellow=16)
+hand = Hand(max_pieces=1)
 queue = Queue(pieces)
 game = Game(3, 3, goal, hand, queue)
 
@@ -800,6 +800,7 @@ while True:
     elif n_algorithm == '2':
         print("Time BFS:",end - start)
     elif n_algorithm == '3':
+        print(game)
         print("Time A*:", end - start)
     elif n_algorithm == '4':
         print("Time Greedy:", end - start)
