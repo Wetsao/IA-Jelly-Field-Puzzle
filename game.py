@@ -144,7 +144,7 @@ class Piece:
 
         if len(valid_neighbors) == 2 and neighbor_counts[valid_neighbors[0]] == neighbor_counts[valid_neighbors[1]]:
             # Se houver um empate, prioriza o vizinho horizontal
-            if index in [0, 2]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
+            if index in [0, 1]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
                 return neighbors[0]
             else:  # Horizontal neighbors for index 1 and 3 are 0 and 2 respectively
                 return neighbors[1]
@@ -370,7 +370,8 @@ class Queue:
     def draw_piece(self):
         if self.pieces:
             self.piece = self.pieces.popleft()
-            self.pieces.append(self.piece)
+            piece_copy = copy.deepcopy(self.piece)
+            self.pieces.append(piece_copy)
             return self.piece
         else:
             return None
@@ -422,7 +423,8 @@ class Game:
         piece = self.hand.get_piece(hand_index)
         if piece:
             self.board.place_piece(row, col, piece)
-            #self.board.pop_clusters()
+            print(f"Placed piece {piece} at ({row}, {col})")
+            self.board.pop_clusters()
             self.refill_hand()
         else:
             print("Invalid piece index or no more pieces in hand.")
@@ -438,65 +440,56 @@ class Game:
 
 
 
+# LEVELS
+def level_1():
+    # Create pieces with a single color
+    pieces = [
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+    ]
+
+    goal = Goal(blue=16, green=16, red=16, yellow=16)
+
+    hand = Hand(max_pieces=2)
+
+    queue = Queue(pieces)
+
+    game = Game(4, 4, goal, hand, queue)
+
+    game.place_piece(0, 2, 0)  # Place first piece at (0, 0)
+    game.place_piece(2, 1, 1)  # Place second piece at (0, 1)
+
+    return game
 
 
 
 
+game = level_1()
 
 
 
 
-
-# Example usage
-pieces = [
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    # #Piece(Color.BLUE, Color.RED, Color.BLUE, Color.BLUE),
-    # Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
-    # Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
-    # Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
-    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
-    # Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
-    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
-    # Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
-    # Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
-]
-
-goal = Goal(blue=0, green=8, red=8, yellow=0)
-hand = Hand(max_pieces=1)
-queue = Queue(pieces)
-game = Game(3, 3, goal, hand, queue)
-
-
-# Place pieces on the board
-game.make_board()
-
-
-
-
-# PARA VER O TABULEIRO ANTES E DEPOIS DO POP, COMENTAR LINHA 336 E DESCOMENTAR AS LINHAS SEGUINTES:
-print("Before popping:")
-print(game)
-game.board.pop_clusters()
-
-
-
-print("\nAfter popping clusters:")
 print(game)
 
 
 # Usage example:
-solver = Solver(game)
-solver2 = Solver(game)
-best_moves = solver.find_best_moves()
-best_moves_bfs = solver2.find_best_moves_bfs()
-print("Best Move Sequence:", best_moves)
-print("Best moves bfs:", best_moves_bfs)
+#solver = Solver(game)
+#solver2 = Solver(game)
+#best_moves = solver.find_best_moves()
+#best_moves_bfs = solver2.find_best_moves_bfs()
+#print("Best Move Sequence:", best_moves)
+#print("Best moves bfs:", best_moves_bfs)
