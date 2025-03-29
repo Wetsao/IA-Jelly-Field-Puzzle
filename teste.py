@@ -3,6 +3,8 @@ import heapq
 import time
 import tracemalloc
 import copy
+import pygame
+from ui_module import gui
 
 class Solver:
     def __init__(self, game):
@@ -611,9 +613,9 @@ class Queue:
     def draw_piece(self):
         if self.pieces:
             self.piece = self.pieces.popleft()
-            self.pieces.append(self.piece)
-            # piece_copy = copy.deepcopy(self.piece)
-            # self.pieces.append(piece_copy)
+            # self.pieces.append(self.piece)
+            piece_copy = copy.deepcopy(self.piece)
+            self.pieces.append(piece_copy)
             return self.piece
         else:
             return None
@@ -834,6 +836,73 @@ elif n_game == '3':
     game = level_3()    
 
 print(game)
+
+# UI---
+
+pygame.init()
+pygame.display.set_caption("Jelly Field")
+WIDTH, HEIGHT = 1000, 900  # Screen size
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+BLOCKSIZE = (screen.get_width() - 500) / game.board.cols
+LILBLOCK = BLOCKSIZE / 2
+gamesize = BLOCKSIZE * game.board.cols
+selected = 0
+
+ui = gui(game, screen,BLOCKSIZE, gamesize)
+screen.fill("purple")
+ui.make_board()
+ui.draw_hand(selected)
+ui.draw_goal()
+print(game)
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            break
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse = pygame.mouse.get_pos()
+            print(mouse)
+            if((250<=mouse[0]<=250+gamesize) and (100<= mouse[1]<= (100+ (BLOCKSIZE*game.board.rows)))):
+                print("(" , (mouse[0]-250) // BLOCKSIZE , "," , (mouse[1]-100) // BLOCKSIZE , ")")
+                x = (mouse[0]-250) // BLOCKSIZE
+                y = (mouse[1]-100) // BLOCKSIZE
+                if(selected != 0):
+                    game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
+                    selected= 0
+                    game.board.pop_clusters()
+                    screen.fill("purple")
+                    game.refill_hand()
+                    ui.make_board()
+                    ui.draw_hand(selected)
+                    ui.draw_goal()
+            if(game.hand.max_pieces == 1):
+                if((WIDTH/2)-LILBLOCK-20<=mouse[0]<=(WIDTH/2)+LILBLOCK+20 and 640 <= mouse[1]<= 825):
+                    selected = 1
+                    ui.draw_hand(selected)
+                else:
+                    selected = 0
+                    ui.draw_hand(selected)
+            if(game.hand.max_pieces == 2):
+                if((WIDTH/2)-25-BLOCKSIZE-20 <=mouse[0] <= (WIDTH/2)-25+20 and 640 <= mouse[1]<= 825):
+                    print("selected= 1")
+                    selected = 1
+                    ui.draw_hand(selected)
+                elif((WIDTH/2)+25-20 <= mouse[0]<= (WIDTH/2)+25+BLOCKSIZE+20 and 640 <= mouse[1]<= 825):
+                    print("selected = 2")
+                    selected= 2
+                    ui.draw_hand(selected)
+                else:
+                    selected = 0
+                    ui.draw_hand(selected)
+
+
+    
+    pygame.display.flip()
+
+pygame.quit()
 
 # Usage example:
 solver = Solver(game)
