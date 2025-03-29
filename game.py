@@ -476,9 +476,99 @@ def level_1():
     return game
 
 
+def level_2():
+    pieces = [
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.BLUE, Color.BLUE, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.RED, Color.BLUE, Color.RED, Color.BLUE),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED)  
+    ]
+
+    goal = Goal(blue=20, green=20, red=20, yellow=20)
+
+    hand = Hand(max_pieces=3)
+
+    queue = Queue(pieces)
+
+    game = Game(5, 5, goal, hand, queue)
+
+    game.place_piece(0, 0, 0)  # Place first piece at (0, 0)
+    game.place_piece(1, 2, 1)  # Place second piece at (0, 1)
+    game.place_piece(0, 4, 2)  # Place third piece at (0, 2)
+    game.place_piece(3, 3, 0)  # Place fourth piece at (0, 3)
+    game.place_piece(4, 1, 1)  # Place fifth piece at (0, 4)
+
+    return game
 
 
-game = level_1()
+def level_3():
+    pieces = [
+        Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW),
+        Piece(Color.GREEN, Color.YELLOW, Color.RED, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.YELLOW, Color.GREEN, Color.RED, Color.BLUE),
+        Piece(Color.BLUE, Color.YELLOW, Color.GREEN, Color.RED),
+        Piece(Color.RED, Color.GREEN, Color.YELLOW, Color.BLUE),
+        Piece(Color.RED, Color.BLUE, Color.RED, Color.BLUE),
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.BLUE, Color.GREEN, Color.RED, Color.YELLOW),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.GREEN, Color.RED, Color.BLUE, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.RED, Color.RED),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+        Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
+        Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
+        Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.GREEN),
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.GREEN, Color.YELLOW, Color.BLUE, Color.RED),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE)
+    ]
+
+
+    goal = Goal(blue=30, green=30, red=30, yellow=30)
+
+    hand = Hand(max_pieces=4)
+
+    queue = Queue(pieces)
+
+    game = Game(6, 6, goal, hand, queue)
+
+    piece_index = 0
+    for row in range(6):
+        for col in range(6):
+            if (row + col) % 2 == 0:  # Chess-like pattern: alternate placement
+                game.place_piece(row, col, piece_index % len(hand.pieces))
+                piece_index += 1
+
+    return game
+
+
+game = level_3()
 
 
 
