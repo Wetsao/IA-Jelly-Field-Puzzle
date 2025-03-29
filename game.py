@@ -216,14 +216,55 @@ class Piece:
     # Retorna o número de ocorrências da cor removida
     def pop_color(self, color):
         count = self.colors.count(color)
-        # for quadrant_index in self.colors:
-            # if self.colors[quadrant_index-1] == color and self.colors[quadrant_index+1] == color:
-            #         self.colors[q_index] = Color.NULL
-            #         self.fill_nulls
-
         self.colors = [Color.NULL if c == color else c for c in self.colors]
         self.fill_nulls()
         return count
+    
+    
+    def pop_connected(self, pos, color):        
+        popped_indices = set()
+    
+        adjacency = {
+            0: [1, 2],  # Top-Left → Top-Right, Bottom-Left
+            1: [0, 3],  # Top-Right → Top-Left, Bottom-Right
+            2: [0, 3],  # Bottom-Left → Top-Left, Bottom-Right
+            3: [1, 2]   # Bottom-Right → Top-Right, Bottom-Left
+        }
+        
+        for start_index in range(4):
+            if self.colors[start_index] != color or start_index in popped_indices:
+                continue
+            
+            stack = [start_index]
+            cluster = []
+            
+            while stack:
+                current = stack.pop()
+                if current in popped_indices or self.colors[current] != color:
+                    continue
+                
+                popped_indices.add(current)
+                cluster.append(current)
+                
+            
+                for neighbor in adjacency[current]:
+                    if neighbor not in popped_indices and self.colors[neighbor] == color:
+                        stack.append(neighbor)
+            
+        
+            # print("pop_color cluster", cluster)
+            # print("pop_color neighbor", neighbor)
+            if len(cluster) >= 2:
+                for idx in cluster: 
+                    self.colors[idx] = Color.NULL
+            if len(cluster) == 1:
+                self.colors[pos] = Color.NULL
+        
+        self.fill_nulls()  # Your existing fill method
+        return len(popped_indices)
+        
+
+        
 
     # Preenche os espaços vazios com cores baseadas nas cores dos vizinhos
     def fill_nulls(self):
@@ -316,86 +357,164 @@ class Board:
                 self.grid[row][col] = None
             return count
         return 0
+    
+    def pop_color_at2(self, row, col, pos, color):
+        piece = self.get_piece(row, col)
+        if piece:
+            count = piece.pop_connected(pos, color)
+            if piece.is_fully_null():
+                self.grid[row][col] = None
+            return count
+        return 0
 
     # Encontra clusters com a mesma cor e remove-as
     # Cluster: conjunto de partes de peças adjacentes com a mesma cor
     def find_clusters(self):
         clusters = []
         visited = set()
+        
+        # # DFS para encontrar clusters
+        # def dfs(r, c, color, direction):
+        #     stack = [(r, c, direction)]
+        #     cluster = []
+        #     while stack:
+        #         row, col, direction = stack.pop()
+        #         if (row, col, direction) not in visited and 0 <= row < self.rows and 0 <= col < self.cols:
+        #             piece = self.get_piece(row, col)
+        #             if piece and color in piece.get_colors():
+        #                 visited.add((row, col, direction))
+        #                 cluster.append((row, col))
+        #                 # Check adjacent cells based on direction
+        #                 if direction == "top-left":
+        #                     if row > 0 and piece.colors[0] == color:  # Top
+        #                         top_piece = self.get_piece(row - 1, col)
+        #                         if top_piece and top_piece.colors[2] == color:
+        #                             stack.append((row - 1, col, "bottom-left"))
+        #                     if col > 0 and piece.colors[0] == color:  # Left
+        #                         left_piece = self.get_piece(row, col - 1)
+        #                         if left_piece and left_piece.colors[1] == color:
+        #                             stack.append((row, col - 1, "top-right"))
+        #                 if direction == "top-right":
+        #                     if row > 0 and piece.colors[1] == color:  # Top
+        #                         top_piece = self.get_piece(row - 1, col)
+        #                         if top_piece and top_piece.colors[3] == color:
+        #                             stack.append((row - 1, col, "bottom-right"))
+        #                     if col < self.cols - 1 and piece.colors[1] == color:  # Right
+        #                         right_piece = self.get_piece(row, col + 1)
+        #                         if right_piece and right_piece.colors[0] == color:
+        #                             stack.append((row, col + 1, "top-left"))
+        #                 if direction == "bottom-left":
+        #                     if row < self.rows - 1 and piece.colors[2] == color:  # Bottom
+        #                         bottom_piece = self.get_piece(row + 1, col)
+        #                         if bottom_piece and bottom_piece.colors[0] == color:
+        #                             stack.append((row + 1, col, "top-left"))
+        #                     if col > 0 and piece.colors[2] == color:  # Left
+        #                         left_piece = self.get_piece(row, col - 1)
+        #                         if left_piece and left_piece.colors[3] == color:
+        #                             stack.append((row, col - 1, "bottom-right"))
+        #                 if direction == "bottom-right":
+        #                     if row < self.rows - 1 and piece.colors[3] == color:  # Bottom
+        #                         bottom_piece = self.get_piece(row + 1, col)
+        #                         if bottom_piece and bottom_piece.colors[1] == color:
+        #                             stack.append((row + 1, col, "top-right"))
+        #                     if col < self.cols - 1 and piece.colors[3] == color:  # Right
+        #                         right_piece = self.get_piece(row, col + 1)
+        #                         if right_piece and right_piece.colors[2] == color:
+        #                             stack.append((row, col + 1, "bottom-left"))
+        #     return cluster
 
-        # DFS para encontrar clusters
-        def dfs(r, c, color, direction):
-            stack = [(r, c, direction)]
+        # for row in range(self.rows):
+        #     for col in range(self.cols):
+        #         piece = self.get_piece(row, col)
+        #         if piece:
+        #             for i, color in enumerate(piece.get_colors()):
+        #                 if color != Color.NULL:
+        #                     direction = ["top-left", "top-right", "bottom-left", "bottom-right"][i]
+        #                     cluster = dfs(row, col, color, direction)
+        #                     if len(cluster) > 1:
+        #                         clusters.append((color, cluster))
+        # return clusters
+
+        def dfs(row, col, quadrant, color):
+            stack = [(row, col, quadrant)]
             cluster = []
             while stack:
-                row, col, direction = stack.pop()
-                if (row, col, direction) not in visited and 0 <= row < self.rows and 0 <= col < self.cols:
-                    piece = self.get_piece(row, col)
-                    if piece and color in piece.get_colors():
-                        visited.add((row, col, direction))
-                        cluster.append((row, col))
-                        # Check adjacent cells based on direction
-                        if direction == "top-left":
-                            if row > 0 and piece.colors[0] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[2] == color:
-                                    stack.append((row - 1, col, "bottom-left"))
-                            if col > 0 and piece.colors[0] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[1] == color:
-                                    stack.append((row, col - 1, "top-right"))
-                        if direction == "top-right":
-                            if row > 0 and piece.colors[1] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[3] == color:
-                                    stack.append((row - 1, col, "bottom-right"))
-                            if col < self.cols - 1 and piece.colors[1] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[0] == color:
-                                    stack.append((row, col + 1, "top-left"))
-                        if direction == "bottom-left":
-                            if row < self.rows - 1 and piece.colors[2] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[0] == color:
-                                    stack.append((row + 1, col, "top-left"))
-                            if col > 0 and piece.colors[2] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[3] == color:
-                                    stack.append((row, col - 1, "bottom-right"))
-                        if direction == "bottom-right":
-                            if row < self.rows - 1 and piece.colors[3] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[1] == color:
-                                    stack.append((row + 1, col, "top-right"))
-                            if col < self.cols - 1 and piece.colors[3] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[2] == color:
-                                    stack.append((row, col + 1, "bottom-left"))
+                r, c, q = stack.pop()
+                if (r, c, q) in visited:
+                    continue
+                piece = self.get_piece(r, c)
+                if not piece or piece.colors[q] != color:
+                    continue
+                visited.add((r, c, q))
+                cluster.append((r, c, q))
+                # Check adjacent quadrants in neighboring pieces
+                if q == 0:  # Top-left quadrant
+                    # Check piece above (its bottom-left quadrant, q=2)
+                    if r > 0:
+                        stack.append((r - 1, c, 2))
+                    # Check left piece (its top-right quadrant, q=1)
+                    if c > 0:
+                        stack.append((r, c - 1, 1))
+                elif q == 1:  # Top-right quadrant
+                    # Check piece above (its bottom-right quadrant, q=3)
+                    if r > 0:
+                        stack.append((r - 1, c, 3))
+                    # Check right piece (its top-left quadrant, q=0)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 0))
+                elif q == 2:  # Bottom-left quadrant
+                    # Check piece below (its top-left quadrant, q=0)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 0))
+                    # Check left piece (its bottom-right quadrant, q=3)
+                    if c > 0:
+                        stack.append((r, c - 1, 3))
+                elif q == 3:  # Bottom-right quadrant
+                    # Check piece below (its top-right quadrant, q=1)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 1))
+                    # Check right piece (its bottom-left quadrant, q=2)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 2))
             return cluster
 
         for row in range(self.rows):
             for col in range(self.cols):
                 piece = self.get_piece(row, col)
                 if piece:
-                    for i, color in enumerate(piece.get_colors()):
-                        if color != Color.NULL:
-                            direction = ["top-left", "top-right", "bottom-left", "bottom-right"][i]
-                            cluster = dfs(row, col, color, direction)
-                            if len(cluster) > 1:
+                    for q in range(4):
+                        color = piece.colors[q]
+                        if color != Color.NULL and (row, col, q) not in visited:
+                            cluster = dfs(row, col, q, color)
+                            if len(cluster) >= 2:  # Minimum cluster size
                                 clusters.append((color, cluster))
         return clusters
+        
 
     # Remove clusters e atualiza o goal
     def pop_clusters(self):
+        # while True:
+        #     clusters = self.find_clusters()
+        #     print("clusts:" ,clusters)
+        #     if not clusters:
+        #         break
+        #     for color, cluster in clusters:
+        #         total_popped = 0
+        #         for row, col in cluster:
+        #             total_popped += self.pop_color_at(row, col, color)
+        #         self.goal.pop_color(color, total_popped)
         while True:
             clusters = self.find_clusters()
+            # print("clusters:" ,clusters)
             if not clusters:
                 break
             for color, cluster in clusters:
+                # print("cluster:", color, cluster)
                 total_popped = 0
-                for row, col in cluster:
-                    total_popped += self.pop_color_at(row, col, color)
+                for (row, col, q) in cluster:
+                    total_popped += self.pop_color_at2(row, col, q, color)
                 self.goal.pop_color(color, total_popped)
+
 
     # Retorna uma representação do tabuleiro como uma string
     def __str__(self):
@@ -581,33 +700,33 @@ pieces = [
     # Piece(Color.GREEN, Color.RED, Color.RED, Color.RED),
     # Piece(Color.RED, Color.RED, Color.RED, Color.RED),    
 
-    # Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
-    # Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
-    # Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
-    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
-    # Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
-    # Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
-    # Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
-    # Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
+    Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
+    Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
+    Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
+    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
+    Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
+    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
+    Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
+    Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
 
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
-    Piece(Color.RED,Color.RED,Color.RED,Color.RED),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
-    Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE)
+    # Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    # Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    # Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    # Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    # Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    # Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
+    # Piece(Color.RED,Color.RED,Color.RED,Color.RED),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
+    # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE)
 
     # Piece(Color.GREEN,Color.GREEN,Color.GREEN,Color.GREEN),
     # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
     # Piece(Color.BLUE,Color.BLUE,Color.BLUE,Color.BLUE),
 ]
 
-goal = Goal(blue=8, green=8, red=0, yellow=0)
+goal = Goal(blue=16, green=16, red=0, yellow=0)
 hand = Hand(max_pieces=2)
 queue = Queue(pieces)
 game = Game(3, 3, goal, hand, queue)
@@ -628,6 +747,9 @@ game.board.pop_clusters()
 print("\nAfter popping clusters:")
 print(game)
 
+
+# hand.get_piece(0)
+# print(game)
 # game.place_piece(0,1,0)
 # print(game)
 # game.place_piece(1,0,0)
