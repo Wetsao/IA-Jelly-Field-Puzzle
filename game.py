@@ -1,7 +1,7 @@
 from collections import deque
-
-
-
+import heapq
+import time
+import tracemalloc
 import copy
 
 class Solver:
@@ -9,12 +9,23 @@ class Solver:
         self.game = game
         self.best_moves = []
         self.number_moves = float('+inf')
+
+    # cria um hash com informaçao do state da board(board, hand, goal, queue) para depois comparar se o state ja foi visitado ou nao
+    def hash_game_state(self, game):
+        board_str = str(game.board.grid)  
+        hand_str = str([str(p) for p in game.hand.pieces])
+        goal_str = str(game.goal.goal)
+        queue_str = str([str(p) for p in game.queue.pieces]) 
+        return hash(board_str + hand_str + goal_str + queue_str)
     
     def dfs(self, game_state, move_sequence, depth):
         if depth == 0 or game_state.is_goal_met():
             if len(move_sequence)<self.number_moves:
                 self.number_moves = len(move_sequence)
                 self.best_moves = move_sequence[:]
+                if game_state.is_goal_met() == True:
+                    print("Goal met")
+                    print(self.best_moves)
             return
         
         for row in range(game_state.board.rows):
@@ -31,20 +42,27 @@ class Solver:
                             self.dfs(new_game_state, move_sequence, depth - 1)
                             move_sequence.pop()
                         except (IndexError, ValueError):
-                            continue  # Ignore invalid moves
+                            continue
     
-    def find_best_moves(self, max_depth=3):
+    def find_best_moves(self, max_depth=6):
         self.dfs(self.game, [], max_depth)
         return self.best_moves
     
     def bfs(self, game):
+        visited = set()
         queu = deque()
         queu.append((game, []))
         while queu:
             game, move_sequence = queu.popleft()
-            if(len(move_sequence) == 1):
-                print(move_sequence, game.is_goal_met())
-                print(game)
+            # if(len(move_sequence) == 1):
+            #     print(move_sequence, game.is_goal_met())
+            #     # print(game)
+
+            current_hash = self.hash_game_state(game)
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
             if(game.is_goal_met()):
                 self.best_moves = move_sequence
                 return
@@ -55,8 +73,11 @@ class Solver:
                 new_game.board.place_piece(move[0],move[1], piece)
                 new_game.board.pop_clusters()
                 new_game.refill_hand()
-                new_sequence = move_sequence + [move]
-                queu.append((new_game, new_sequence))
+                
+                state_hash = self.hash_game_state(new_game)
+                if state_hash not in visited:
+                    new_sequence = move_sequence + [move] 
+                    queu.append((new_game, new_sequence))
 
     def possible_moves(self, game):
         possible_moves = []
@@ -70,15 +91,107 @@ class Solver:
                             new_game.board.place_piece(row, cols, piece)
                             possible_moves.append((row,cols,hand))
                         except (IndexError, ValueError):
-                            continue  # Ignore invalid moves
+                            continue 
         return possible_moves
     
     def find_best_moves_bfs(self):
         self.bfs(self.game)
         return self.best_moves
+    
+    def a_star(self):
+        visited = {} 
+        priority_queue = []
+        entry_count = 0
 
+        initial_state = copy.deepcopy(self.game)
+        initial_g = 0
+        initial_h = self.heuristic2(initial_state)
+        heapq.heappush(priority_queue, (initial_g + initial_h, entry_count, initial_state, []))
+        entry_count += 1
 
+        while priority_queue:
+            f, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
 
+            # print(move_sequence, game.is_goal_met())
+            # print(game)
+
+            if current_hash in visited and visited[current_hash] <= f:
+                continue
+            visited[current_hash] = f
+
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece) 
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_g = len(move_sequence) + 1  # Cada move custa 1
+                new_h = self.heuristic2(new_game)
+                new_f = new_g + new_h
+                new_hash = self.hash_game_state(new_game)
+                
+                if new_hash not in visited or new_f < visited.get(new_hash, float('+inf')):
+                    heapq.heappush(priority_queue, (new_f, entry_count, new_game, move_sequence + [move]))  
+                    entry_count += 1
+
+    def greedy(self):
+        visited = set()
+        priority_queue = []
+        entry_count = 0
+        initial_state = copy.deepcopy(self.game)
+        initial_h = self.heuristic1(initial_state)
+        heapq.heappush(priority_queue, (initial_h, entry_count, initial_state, []))
+        entry_count += 1
+
+        while priority_queue:
+            h, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
+
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece)
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_h = self.heuristic1(new_game)
+                new_hash = self.hash_game_state(new_game)
+
+                if new_hash not in visited:
+                    heapq.heappush(priority_queue, (new_h, entry_count, new_game, move_sequence + [move]))
+                    entry_count += 1
+
+    # Heuristica simples calcula soma total do objetivo
+    def heuristic1(self, game):
+        return game.goal.goal_sum() 
+    
+    
+    # Heuristica assume que qualquer move elimina o maximo de cores possiveis
+    def heuristic2(self, game):
+        total_remaining = game.goal.goal_sum()
+        return (total_remaining + 3) // 4  
+
+    
 
 
 
@@ -106,6 +219,52 @@ class Piece:
         self.colors = [Color.NULL if c == color else c for c in self.colors]
         self.fill_nulls()
         return count
+    
+    
+    def pop_connected(self, pos, color):        
+        popped_indices = set()
+    
+        adjacency = {
+            0: [1, 2],  # Top-Left → Top-Right, Bottom-Left
+            1: [0, 3],  # Top-Right → Top-Left, Bottom-Right
+            2: [0, 3],  # Bottom-Left → Top-Left, Bottom-Right
+            3: [1, 2]   # Bottom-Right → Top-Right, Bottom-Left
+        }
+        
+        for start_index in range(4):
+            if self.colors[start_index] != color or start_index in popped_indices:
+                continue
+            
+            stack = [start_index]
+            cluster = []
+            
+            while stack:
+                current = stack.pop()
+                if current in popped_indices or self.colors[current] != color:
+                    continue
+                
+                popped_indices.add(current)
+                cluster.append(current)
+                
+            
+                for neighbor in adjacency[current]:
+                    if neighbor not in popped_indices and self.colors[neighbor] == color:
+                        stack.append(neighbor)
+            
+        
+            # print("pop_color cluster", cluster)
+            # print("pop_color neighbor", neighbor)
+            if len(cluster) >= 2:
+                for idx in cluster: 
+                    self.colors[idx] = Color.NULL
+            if len(cluster) == 1:
+                self.colors[pos] = Color.NULL
+        
+        self.fill_nulls()  # Your existing fill method
+        return len(popped_indices)
+        
+
+        
 
     # Preenche os espaços vazios com cores baseadas nas cores dos vizinhos
     def fill_nulls(self):
@@ -175,7 +334,8 @@ class Board:
     def place_piece(self, row, col, piece):
         if 0 <= row < self.rows and 0 <= col < self.cols:
             if self.grid[row][col] is None:
-                self.grid[row][col] = piece
+                new_piece = copy.deepcopy(piece)
+                self.grid[row][col] = new_piece
             else:
                 raise ValueError("Position already occupied")
         else:
@@ -197,86 +357,164 @@ class Board:
                 self.grid[row][col] = None
             return count
         return 0
+    
+    def pop_color_at2(self, row, col, pos, color):
+        piece = self.get_piece(row, col)
+        if piece:
+            count = piece.pop_connected(pos, color)
+            if piece.is_fully_null():
+                self.grid[row][col] = None
+            return count
+        return 0
 
     # Encontra clusters com a mesma cor e remove-as
     # Cluster: conjunto de partes de peças adjacentes com a mesma cor
     def find_clusters(self):
         clusters = []
         visited = set()
+        
+        # # DFS para encontrar clusters
+        # def dfs(r, c, color, direction):
+        #     stack = [(r, c, direction)]
+        #     cluster = []
+        #     while stack:
+        #         row, col, direction = stack.pop()
+        #         if (row, col, direction) not in visited and 0 <= row < self.rows and 0 <= col < self.cols:
+        #             piece = self.get_piece(row, col)
+        #             if piece and color in piece.get_colors():
+        #                 visited.add((row, col, direction))
+        #                 cluster.append((row, col))
+        #                 # Check adjacent cells based on direction
+        #                 if direction == "top-left":
+        #                     if row > 0 and piece.colors[0] == color:  # Top
+        #                         top_piece = self.get_piece(row - 1, col)
+        #                         if top_piece and top_piece.colors[2] == color:
+        #                             stack.append((row - 1, col, "bottom-left"))
+        #                     if col > 0 and piece.colors[0] == color:  # Left
+        #                         left_piece = self.get_piece(row, col - 1)
+        #                         if left_piece and left_piece.colors[1] == color:
+        #                             stack.append((row, col - 1, "top-right"))
+        #                 if direction == "top-right":
+        #                     if row > 0 and piece.colors[1] == color:  # Top
+        #                         top_piece = self.get_piece(row - 1, col)
+        #                         if top_piece and top_piece.colors[3] == color:
+        #                             stack.append((row - 1, col, "bottom-right"))
+        #                     if col < self.cols - 1 and piece.colors[1] == color:  # Right
+        #                         right_piece = self.get_piece(row, col + 1)
+        #                         if right_piece and right_piece.colors[0] == color:
+        #                             stack.append((row, col + 1, "top-left"))
+        #                 if direction == "bottom-left":
+        #                     if row < self.rows - 1 and piece.colors[2] == color:  # Bottom
+        #                         bottom_piece = self.get_piece(row + 1, col)
+        #                         if bottom_piece and bottom_piece.colors[0] == color:
+        #                             stack.append((row + 1, col, "top-left"))
+        #                     if col > 0 and piece.colors[2] == color:  # Left
+        #                         left_piece = self.get_piece(row, col - 1)
+        #                         if left_piece and left_piece.colors[3] == color:
+        #                             stack.append((row, col - 1, "bottom-right"))
+        #                 if direction == "bottom-right":
+        #                     if row < self.rows - 1 and piece.colors[3] == color:  # Bottom
+        #                         bottom_piece = self.get_piece(row + 1, col)
+        #                         if bottom_piece and bottom_piece.colors[1] == color:
+        #                             stack.append((row + 1, col, "top-right"))
+        #                     if col < self.cols - 1 and piece.colors[3] == color:  # Right
+        #                         right_piece = self.get_piece(row, col + 1)
+        #                         if right_piece and right_piece.colors[2] == color:
+        #                             stack.append((row, col + 1, "bottom-left"))
+        #     return cluster
 
-        # DFS para encontrar clusters
-        def dfs(r, c, color, direction):
-            stack = [(r, c, direction)]
+        # for row in range(self.rows):
+        #     for col in range(self.cols):
+        #         piece = self.get_piece(row, col)
+        #         if piece:
+        #             for i, color in enumerate(piece.get_colors()):
+        #                 if color != Color.NULL:
+        #                     direction = ["top-left", "top-right", "bottom-left", "bottom-right"][i]
+        #                     cluster = dfs(row, col, color, direction)
+        #                     if len(cluster) > 1:
+        #                         clusters.append((color, cluster))
+        # return clusters
+
+        def dfs(row, col, quadrant, color):
+            stack = [(row, col, quadrant)]
             cluster = []
             while stack:
-                row, col, direction = stack.pop()
-                if (row, col, direction) not in visited and 0 <= row < self.rows and 0 <= col < self.cols:
-                    piece = self.get_piece(row, col)
-                    if piece and color in piece.get_colors():
-                        visited.add((row, col, direction))
-                        cluster.append((row, col))
-                        # Check adjacent cells based on direction
-                        if direction == "top-left":
-                            if row > 0 and piece.colors[0] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[2] == color:
-                                    stack.append((row - 1, col, "bottom-left"))
-                            if col > 0 and piece.colors[0] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[1] == color:
-                                    stack.append((row, col - 1, "top-right"))
-                        if direction == "top-right":
-                            if row > 0 and piece.colors[1] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[3] == color:
-                                    stack.append((row - 1, col, "bottom-right"))
-                            if col < self.cols - 1 and piece.colors[1] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[0] == color:
-                                    stack.append((row, col + 1, "top-left"))
-                        if direction == "bottom-left":
-                            if row < self.rows - 1 and piece.colors[2] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[0] == color:
-                                    stack.append((row + 1, col, "top-left"))
-                            if col > 0 and piece.colors[2] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[3] == color:
-                                    stack.append((row, col - 1, "bottom-right"))
-                        if direction == "bottom-right":
-                            if row < self.rows - 1 and piece.colors[3] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[1] == color:
-                                    stack.append((row + 1, col, "top-right"))
-                            if col < self.cols - 1 and piece.colors[3] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[2] == color:
-                                    stack.append((row, col + 1, "bottom-left"))
+                r, c, q = stack.pop()
+                if (r, c, q) in visited:
+                    continue
+                piece = self.get_piece(r, c)
+                if not piece or piece.colors[q] != color:
+                    continue
+                visited.add((r, c, q))
+                cluster.append((r, c, q))
+                # Check adjacent quadrants in neighboring pieces
+                if q == 0:  # Top-left quadrant
+                    # Check piece above (its bottom-left quadrant, q=2)
+                    if r > 0:
+                        stack.append((r - 1, c, 2))
+                    # Check left piece (its top-right quadrant, q=1)
+                    if c > 0:
+                        stack.append((r, c - 1, 1))
+                elif q == 1:  # Top-right quadrant
+                    # Check piece above (its bottom-right quadrant, q=3)
+                    if r > 0:
+                        stack.append((r - 1, c, 3))
+                    # Check right piece (its top-left quadrant, q=0)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 0))
+                elif q == 2:  # Bottom-left quadrant
+                    # Check piece below (its top-left quadrant, q=0)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 0))
+                    # Check left piece (its bottom-right quadrant, q=3)
+                    if c > 0:
+                        stack.append((r, c - 1, 3))
+                elif q == 3:  # Bottom-right quadrant
+                    # Check piece below (its top-right quadrant, q=1)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 1))
+                    # Check right piece (its bottom-left quadrant, q=2)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 2))
             return cluster
 
         for row in range(self.rows):
             for col in range(self.cols):
                 piece = self.get_piece(row, col)
                 if piece:
-                    for i, color in enumerate(piece.get_colors()):
-                        if color != Color.NULL:
-                            direction = ["top-left", "top-right", "bottom-left", "bottom-right"][i]
-                            cluster = dfs(row, col, color, direction)
-                            if len(cluster) > 1:
+                    for q in range(4):
+                        color = piece.colors[q]
+                        if color != Color.NULL and (row, col, q) not in visited:
+                            cluster = dfs(row, col, q, color)
+                            if len(cluster) >= 2:  # Minimum cluster size
                                 clusters.append((color, cluster))
         return clusters
+        
 
     # Remove clusters e atualiza o goal
     def pop_clusters(self):
+        # while True:
+        #     clusters = self.find_clusters()
+        #     print("clusts:" ,clusters)
+        #     if not clusters:
+        #         break
+        #     for color, cluster in clusters:
+        #         total_popped = 0
+        #         for row, col in cluster:
+        #             total_popped += self.pop_color_at(row, col, color)
+        #         self.goal.pop_color(color, total_popped)
         while True:
             clusters = self.find_clusters()
+            # print("clusters:" ,clusters)
             if not clusters:
                 break
             for color, cluster in clusters:
+                # print("cluster:", color, cluster)
                 total_popped = 0
-                for row, col in cluster:
-                    total_popped += self.pop_color_at(row, col, color)
+                for (row, col, q) in cluster:
+                    total_popped += self.pop_color_at2(row, col, q, color)
                 self.goal.pop_color(color, total_popped)
+
 
     # Retorna uma representação do tabuleiro como uma string
     def __str__(self):
@@ -319,6 +557,10 @@ class Goal:
     # Retorna True se o objetivo for atingido
     def is_goal_met(self):
         return all(count == 0 for count in self.goal.values())
+
+    # Retorna numero total do objetivo
+    def goal_sum(self):
+        return sum(self.goal.values())
 
     # Retorna uma representação do objetivo como uma string
     def __str__(self):
@@ -409,6 +651,8 @@ class Game:
         self.board.place_piece(2,2,self.queue.draw_piece())
         self.board.place_piece(2,1,self.queue.draw_piece())
 
+        
+
     # Preenche a mão com peças da fila
     def refill_hand(self):
         while len(self.hand.pieces) < self.hand.max_pieces:
@@ -423,7 +667,6 @@ class Game:
         piece = self.hand.get_piece(hand_index)
         if piece:
             self.board.place_piece(row, col, piece)
-            print(f"Placed piece {piece} at ({row}, {col})")
             self.board.pop_clusters()
             self.refill_hand()
         else:
@@ -432,7 +675,7 @@ class Game:
     # verifica se o objetivo foi atingido
     def is_goal_met(self):
         return self.goal.is_goal_met()
-
+    
     # Retorna uma representação do jogo como uma string
     def __str__(self):
         return f"{self.board}\n\n{self.goal}\n\n{self.hand}\n\n{self.queue}"
@@ -576,10 +819,60 @@ game = level_3()
 print(game)
 
 
+# hand.get_piece(0)
+# print(game)
+# game.place_piece(0,1,0)
+# print(game)
+# game.place_piece(1,0,0)
+# print(game)
+# game.place_piece(1,2,0)
+# print(game)
+# game.place_piece(1,1,0)
+# print(game)
+# game.place_piece(0,1,0)
+# print(game)
+
+
+
 # Usage example:
-#solver = Solver(game)
-#solver2 = Solver(game)
-#best_moves = solver.find_best_moves()
-#best_moves_bfs = solver2.find_best_moves_bfs()
-#print("Best Move Sequence:", best_moves)
-#print("Best moves bfs:", best_moves_bfs)
+solver = Solver(game)
+best_moves = []
+
+while True:
+    print("What algorithm do you want to test?")
+    print("1.DFS")
+    print("2.BFS")
+    print("3.A*")
+    print("4.greedy")
+    n_algorithm = input()
+    print("\n")
+
+    if n_algorithm == '1':
+        start = time.time()
+        best_moves = solver.find_best_moves()
+        end = time.time()
+    elif n_algorithm == '2':
+        start = time.time()
+        best_moves = solver.find_best_moves_bfs()
+        end = time.time()
+    elif n_algorithm == '3':
+        start = time.time()
+        best_moves = solver.a_star()
+        end = time.time()
+    elif n_algorithm == '4':
+        start = time.time()
+        best_moves = solver.greedy()
+        end = time.time()
+
+    print("Best Move Sequence:", best_moves)
+
+    if n_algorithm == '1':
+        print("Time DFS:",end - start)
+    elif n_algorithm == '2':
+        print("Time BFS:",end - start)
+    elif n_algorithm == '3':
+        print("Time A*:", end - start)
+    elif n_algorithm == '4':
+        print("Time Greedy:", end - start)
+
+    print("\n")
