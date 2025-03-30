@@ -682,12 +682,15 @@ class Game:
     
 
 
-
 # LEVELS
 def level_1():
+
+    boardpieces = [
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+    ]
+
     # Create pieces with a single color
     pieces = [
-        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.RED, Color.RED),
         Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
@@ -705,26 +708,28 @@ def level_1():
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
     ]
 
-    goal = Goal(blue=16, green=16, red=16, yellow=16)
+    goal = Goal(blue=8, green=8, red=8, yellow=8)
 
-    hand = Hand(max_pieces=2)
+    hand = Hand(max_pieces=1)
 
     queue = Queue(pieces)
 
-    game = Game(4, 4, goal, hand, queue)
+    game = Game(3, 3, goal, hand, queue)
 
-    game.place_piece(0, 2, 0)  # Place first piece at (0, 0)
-    game.place_piece(2, 1, 1)  # Place second piece at (0, 1)
-
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
     return game
 
 
 def level_2():
-    pieces = [
+
+    boardpieces = [
         Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
         Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
         Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+    ]
+
+    pieces = [
         Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
         Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
         Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
@@ -743,25 +748,26 @@ def level_2():
         Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED)  
     ]
 
-    goal = Goal(blue=20, green=20, red=20, yellow=20)
+    goal = Goal(blue=10, green=8, red=10, yellow=8)
 
-    hand = Hand(max_pieces=3)
+    hand = Hand(max_pieces=1)
 
     queue = Queue(pieces)
 
-    game = Game(5, 5, goal, hand, queue)
+    game = Game(4, 4, goal, hand, queue)
 
-    game.place_piece(0, 0, 0)  # Place first piece at (0, 0)
-    game.place_piece(1, 2, 1)  # Place second piece at (0, 1)
-    game.place_piece(0, 4, 2)  # Place third piece at (0, 2)
-    game.place_piece(3, 3, 0)  # Place fourth piece at (0, 3)
-    game.place_piece(4, 1, 1)  # Place fifth piece at (0, 4)
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
+    game.board.place_piece(2, 2, boardpieces[1])  # Place second piece at (2,2)
+    game.board.place_piece(0, 3, boardpieces[2])  # Place third piece at (0,3)
+    game.board.place_piece(3, 0, boardpieces[3])  # Place fourth piece at (3,0)
+    
 
     return game
 
 
 def level_3():
-    pieces = [
+
+    boardpieces = [
         Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
         Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
         Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
@@ -770,6 +776,9 @@ def level_3():
         Piece(Color.RED, Color.RED, Color.RED, Color.RED),
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
         Piece(Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW),
+    ]
+
+    pieces = [
         Piece(Color.GREEN, Color.YELLOW, Color.RED, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
         Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
@@ -793,20 +802,22 @@ def level_3():
     ]
 
 
-    goal = Goal(blue=30, green=30, red=30, yellow=30)
+    goal = Goal(blue=12, green=12, red=12, yellow=12)
 
-    hand = Hand(max_pieces=4)
+    hand = Hand(max_pieces=2)
 
     queue = Queue(pieces)
 
-    game = Game(6, 6, goal, hand, queue)
+    game = Game(4, 4, goal, hand, queue)
 
-    piece_index = 0
-    for row in range(6):
-        for col in range(6):
-            if (row + col) % 2 == 0:  # Chess-like pattern: alternate placement
-                game.place_piece(row, col, piece_index % len(hand.pieces))
-                piece_index += 1
+    game.board.place_piece(0, 0, boardpieces[0])  # Place first piece at (0,0)
+    game.board.place_piece(0, 2, boardpieces[1])  # Place second piece at (0,2)
+    game.board.place_piece(1, 1, boardpieces[2])  # Place third piece at (1,1)
+    game.board.place_piece(1, 3, boardpieces[3])  # Place fourth piece at (1,3)
+    game.board.place_piece(2, 0, boardpieces[4])  # Place fifth piece at (2,0)
+    game.board.place_piece(2, 2, boardpieces[5])  # Place sixth piece at (2,2)
+    game.board.place_piece(3, 1, boardpieces[6])  # Place seventh piece at (3,1)
+    game.board.place_piece(3, 3, boardpieces[7])  # Place eighth piece at (3,3)
 
     return game
 
@@ -817,20 +828,6 @@ game = level_3()
 
 
 print(game)
-
-
-# hand.get_piece(0)
-# print(game)
-# game.place_piece(0,1,0)
-# print(game)
-# game.place_piece(1,0,0)
-# print(game)
-# game.place_piece(1,2,0)
-# print(game)
-# game.place_piece(1,1,0)
-# print(game)
-# game.place_piece(0,1,0)
-# print(game)
 
 
 
