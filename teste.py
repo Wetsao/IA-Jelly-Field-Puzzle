@@ -1,6 +1,7 @@
 from collections import deque
 import heapq
 import time
+import threading
 import tracemalloc
 import copy
 import pygame
@@ -334,8 +335,8 @@ class Board:
     def place_piece(self, row, col, piece):
         if 0 <= row < self.rows and 0 <= col < self.cols:
             if self.grid[row][col] is None:
-                # new_piece = copy.deepcopy(piece)
-                # self.grid[row][col] = new_piece
+                #new_piece = copy.deepcopy(piece)
+                #self.grid[row][col] = new_piece
                 self.grid[row][col] = piece
             else:
                 raise ValueError("Position already occupied")
@@ -822,70 +823,248 @@ def level_3():
 
 
 
-print("Choose your level")
-print("level 1 4x4")
-print("level 2 5x5")
-print("level 3 6x6")
-n_game = input()
+# print("Choose your level")
+# print("level 1 4x4")
+# print("level 2 5x5")
+# print("level 3 6x6")
+# n_game = input()
 
-if n_game == '1':
-    game = level_1()
-elif n_game == '2':
-    game = level_2()
-elif n_game == '3':
-    game = level_3()    
+# if n_game == '1':
+#     game = level_1()
+# elif n_game == '2':
+#     game = level_2()
+# elif n_game == '3':
+#     game = level_3()    
 
-print(game)
+# print(game)
 
-# UI---
+# UI--- START
 
 pygame.init()
 pygame.display.set_caption("Jelly Field")
 WIDTH, HEIGHT = 1000, 900  # Screen size
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
+
+# LEVEL SELECTING --------------------
+
+
+BUTTON_WIDTH, BUTTON_HEIGHT = 100, 50
+PADDING = 20  
+
+# Colors
+PURPLE = (128, 0, 128)
+BUTTON_COLOR = (255, 223, 0)  # Bright Yellow
+HOVER_COLOR = (200, 180, 0)   # Slightly darker yellow
+TEXT_COLOR = (0, 0, 0)  # Black
+
+# Number of levels (Change this to any number)
+NUM_LEVELS = 3
+
+
+# Font
+font = pygame.font.Font(None, 36)
+
+# Button positions (dynamically calculated)
+buttons = []
+start_x = (WIDTH - ((NUM_LEVELS * BUTTON_WIDTH) + (NUM_LEVELS - 1) * PADDING)) // 2
+start_y = (HEIGHT / 2)- (BUTTON_HEIGHT / 2)  # Positioning at the top
+
+for i in range(NUM_LEVELS):
+    x = start_x + i * (BUTTON_WIDTH + PADDING)
+    y = start_y
+    buttons.append(pygame.Rect(x, y, BUTTON_WIDTH, BUTTON_HEIGHT))
+
+# Game loop
+selecting_level = True
+while selecting_level:
+    screen.fill("purple")  # Set background color
+
+    # Get mouse position
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
+    # Draw buttons
+    for i, button in enumerate(buttons):
+        # Check if mouse is hovering
+        if button.collidepoint(mouse_x, mouse_y):
+            color = HOVER_COLOR
+        else:
+            color = BUTTON_COLOR
+
+        # Draw button
+        pygame.draw.rect(screen, color, button, border_radius=10)
+
+        # Draw button text
+        text = font.render(f"Level {i + 1}", True, TEXT_COLOR)
+        text_rect = text.get_rect(center=button.center)
+        screen.blit(text, text_rect)
+
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            selecting_level = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            for i, button in enumerate(buttons):
+                if button.collidepoint(event.pos):
+                    print(f"Selected Level {i + 1}")  # Print selected level
+                    n = i+1
+                    if(n== 1):
+                        game = level_1()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+                    elif(n==2):
+                        game = level_2()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+                    elif(n==3):
+                        game = level_3()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+
+    pygame.display.flip()
+
+
+# ACTUAL LEVEL DRAWING AND GAMELOOP --------
+
 BLOCKSIZE = (screen.get_width() - 500) / game.board.cols
 LILBLOCK = BLOCKSIZE / 2
 gamesize = BLOCKSIZE * game.board.cols
 selected = 0
 
+            
+
 ui = gui(game, screen,BLOCKSIZE, gamesize)
-screen.fill("purple")
+
+
+
 ui.make_board()
 ui.draw_hand(selected)
 ui.draw_goal()
 print(game)
 running = True
+searchButtons = []
+searchButtons.append(pygame.Rect(16, 100, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(132, 100, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(16, 116 +BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(132, 116 +BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(766, 350, BUTTON_WIDTH*2 +16, BUTTON_HEIGHT))
+searchNames = []
+searchNames.append("BFS")
+searchNames.append("DFS")
+searchNames.append("A*")
+searchNames.append("Greedy")
+searchNames.append("Hint")
+
+
 
 while running:
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    for i, searchbutton in enumerate(searchButtons):
+        
+        if searchbutton.collidepoint(mouse_x, mouse_y):
+            color = HOVER_COLOR
+        else:
+            color = BUTTON_COLOR
+
+        # Draw button
+        pygame.draw.rect(screen, color, searchbutton, border_radius=10)
+
+        # Draw button text
+        text = font.render(searchNames[i], True, TEXT_COLOR)
+        text_rect = text.get_rect(center=searchbutton.center)
+        screen.blit(text, text_rect)
+    if(game.board.goal.is_goal_met()):
+        screen.fill("purple")
+        font = pygame.font.SysFont(None, 36)
+        vic_text = font.render("VICTORY!", True, (255, 255, 255))
+        screen.blit(vic_text, (WIDTH/2, HEIGHT/2))
+        pygame.display.flip()
+        pygame.time.delay(10000)
+        running = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
             break
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            for i, searchbutton in enumerate(searchButtons):
+                if searchbutton.collidepoint(event.pos):
+                    def run_solver():
+                        solver = Solver(game)
+                        if i == 0:  # BFS
+                            start = time.time()
+                            best_moves = solver.find_best_moves_bfs()
+                            end = time.time()
+                        elif i == 1:  # DFS
+                            start = time.time()
+                            best_moves = solver.find_best_moves()
+                            end = time.time()
+                        elif i == 2:  # A*
+                            start = time.time()
+                            best_moves = solver.a_star()
+                            end = time.time()
+                        elif i == 3:  # Greedy
+                            start = time.time()
+                            best_moves = solver.greedy()
+                            end = time.time()
+                        elif i == 4:  # Hint
+                            # Implement hint logic
+                            pass
+                        print(f"Solver finished with moves: {best_moves}")
+                        screen.fill("purple")
+                        ui.draw_goal()
+                        ui.draw_hand(selected)
+                        ui.make_board()
+                        timetext = font.render(f"Time: {end - start:.5f}", True, TEXT_COLOR)
+                        screen.blit(timetext, (16, 250))
+                        pygame.display.flip()
+                        
+                        
+                    solver_thread = threading.Thread(target=run_solver)
+                    solver_thread.daemon = True  
+                    solver_thread.start()
+                    
             mouse = pygame.mouse.get_pos()
             print(mouse)
             if((250<=mouse[0]<=250+gamesize) and (100<= mouse[1]<= (100+ (BLOCKSIZE*game.board.rows)))):
                 print("(" , (mouse[0]-250) // BLOCKSIZE , "," , (mouse[1]-100) // BLOCKSIZE , ")")
                 x = (mouse[0]-250) // BLOCKSIZE
                 y = (mouse[1]-100) // BLOCKSIZE
-                if(selected != 0):
-                    game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
-                    selected= 0
-                    game.board.pop_clusters()
-                    screen.fill("purple")
-                    game.refill_hand()
-                    ui.make_board()
-                    ui.draw_hand(selected)
-                    ui.draw_goal()
-            if(game.hand.max_pieces == 1):
+                if selected != 0:
+                    try: 
+                        print("teste")
+                        piece = copy.deepcopy(game.hand.pieces[selected-1])
+                        game_teste = copy.deepcopy(game)
+                        game_teste.board.place_piece(int(y), int(x), piece)
+                        # selected= 0
+                        # ui.draw_hand(selected)
+                        # ui.draw_goal()
+                    except (IndexError, ValueError):
+                        print("ola")
+                    else:
+                        game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
+                        game.board.pop_clusters()
+                        screen.fill("purple")
+                        game.refill_hand()
+                        ui.make_board()
+                    finally:
+                        selected = 0
+                        # game.board.pop_clusters()
+                        # screen.fill("purple")
+                        # game.refill_hand()
+                        # ui.make_board()
+                        ui.draw_hand(selected)
+                        ui.draw_goal()
+            elif(game.hand.max_pieces == 1):
                 if((WIDTH/2)-LILBLOCK-20<=mouse[0]<=(WIDTH/2)+LILBLOCK+20 and 640 <= mouse[1]<= 825):
                     selected = 1
                     ui.draw_hand(selected)
                 else:
                     selected = 0
                     ui.draw_hand(selected)
-            if(game.hand.max_pieces == 2):
+            elif(game.hand.max_pieces == 2):
                 if((WIDTH/2)-25-BLOCKSIZE-20 <=mouse[0] <= (WIDTH/2)-25+20 and 640 <= mouse[1]<= 825):
                     print("selected= 1")
                     selected = 1
@@ -905,8 +1084,7 @@ while running:
 pygame.quit()
 
 # Usage example:
-solver = Solver(game)
-best_moves = []
+
 
 while True:
     print("What algorithm do you want to test?")
