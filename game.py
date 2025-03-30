@@ -44,7 +44,7 @@ class Solver:
                         except (IndexError, ValueError):
                             continue
     
-    def find_best_moves(self, max_depth=6):
+    def find_best_moves(self, max_depth=4):
         self.dfs(self.game, [], max_depth)
         return self.best_moves
     
