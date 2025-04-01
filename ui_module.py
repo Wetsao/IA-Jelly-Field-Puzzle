@@ -9,11 +9,12 @@ class gui:
         self.LILBLOCK = self.BLOCKSIZE / 2
         self.gamesize = gamesize
 
+    #Draws the piece's
     def drawlil(self,screen, a, y, x):
         for i in range(4):
-            if(i == 0 or i == 3):
+            if(i == 0 or i == 2):
                 dist = 0
-            if(i == 1 or i ==2):
+            if(i == 1 or i == 3):
                 dist= self.LILBLOCK
             if(i == 0 or i == 1):
                 dist2 = 0
@@ -27,7 +28,7 @@ class gui:
             (posx, posy, self.LILBLOCK,self.LILBLOCK)
             )
             
-
+    #Returns the 4 colors depending on what letter is called
     def getcolor(self, a):
         if(a == 'B'):
             return (0,0,255)
@@ -40,6 +41,7 @@ class gui:
         else:
             return (255, 255, 255)
         
+    #Draws grid for game board
     def draw_grid(self):
         start_x = (self.screen.get_width() - self.gamesize) / 2
         start_y = 100
@@ -61,7 +63,8 @@ class gui:
                             (start_x, y), 
                             (start_x + self.game.board.cols * self.BLOCKSIZE, y), 
                             5)
-        
+
+    #Draws game objective 
     def draw_goal(self):
         """Draws the goal information at the top of the screen"""
         panel_height = 80
@@ -105,10 +108,8 @@ class gui:
                 text_width = text.get_width() + 40  # 40 = circle + spacing
                 x_position += text_width + 20  # Additional spacing
 
-    # def draw_hand(self, selected, hand, max_piece):
-    #     print("Yet to be implemented")
+    #Draws all pieces in the hand with white background, centered on screen
     def draw_hand(self, selected):
-        """Draws all pieces in the hand with white background, centered on screen"""
         if not self.game.hand.pieces:
             return  # No pieces to draw
         
@@ -156,6 +157,7 @@ class gui:
                             (border_x, hand_y, piece_width, piece_width),
                             2)  # Border thickness
 
+    #Draws game board
     def make_board(self):
         for i in range (self.game.board.rows):
             for j in range (self.game.board.cols):

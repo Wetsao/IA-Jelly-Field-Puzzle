@@ -12,6 +12,7 @@ class Solver:
         self.game = game
         self.best_moves = []
         self.number_moves = float('+inf')
+        iteration = 0
 
     # cria um hash com informaçao do state da board(board, hand, goal, queue) para depois comparar se o state ja foi visitado ou nao
     def hash_game_state(self, game):
@@ -26,9 +27,9 @@ class Solver:
             if len(move_sequence)<self.number_moves:
                 self.number_moves = len(move_sequence)
                 self.best_moves = move_sequence[:]
-                if game_state.is_goal_met() == True:
-                    print("Goal met")
-                    print(self.best_moves)
+                # if game_state.is_goal_met() == True:
+                #     print("Goal met")
+                #     print(self.best_moves)
             return
         
         for row in range(game_state.board.rows):
@@ -42,12 +43,14 @@ class Solver:
                             new_game_state.board.pop_clusters()
                             new_game_state.refill_hand()
                             move_sequence.append((row, col, hand_index))
+                            self.iteration += 1
                             self.dfs(new_game_state, move_sequence, depth - 1)
                             move_sequence.pop()
                         except (IndexError, ValueError):
                             continue
     
     def find_best_moves(self, max_depth=6):
+        self.iteration = 0
         self.dfs(self.game, [], max_depth)
         return self.best_moves
     
@@ -78,6 +81,7 @@ class Solver:
                 new_game.refill_hand()
                 
                 state_hash = self.hash_game_state(new_game)
+                self.iteration += 1
                 if state_hash not in visited:
                     new_sequence = move_sequence + [move] 
                     queu.append((new_game, new_sequence))
@@ -98,6 +102,7 @@ class Solver:
         return possible_moves
     
     def find_best_moves_bfs(self):
+        self.iteration = 0
         self.bfs(self.game)
         return self.best_moves
     
@@ -105,7 +110,7 @@ class Solver:
         visited = {} 
         priority_queue = []
         entry_count = 0
-
+        self.iteration = 0
         initial_state = copy.deepcopy(self.game)
         initial_g = 0
         initial_h = self.heuristic2(initial_state)
@@ -123,6 +128,7 @@ class Solver:
                 continue
             visited[current_hash] = f
 
+            #Base case
             if current_game.is_goal_met():
                 self.best_moves = move_sequence
                 return self.best_moves
@@ -137,11 +143,13 @@ class Solver:
                 except (IndexError, ValueError):
                     continue
 
-                new_g = len(move_sequence) + 1  # Cada move custa 1
+                new_g = len(move_sequence) + 1  
                 new_h = self.heuristic2(new_game)
                 new_f = new_g + new_h
                 new_hash = self.hash_game_state(new_game)
                 
+                self.iteration += 1
+
                 if new_hash not in visited or new_f < visited.get(new_hash, float('+inf')):
                     heapq.heappush(priority_queue, (new_f, entry_count, new_game, move_sequence + [move]))  
                     entry_count += 1
@@ -150,6 +158,7 @@ class Solver:
         visited = set()
         priority_queue = []
         entry_count = 0
+        self.iteration = 0
         initial_state = copy.deepcopy(self.game)
         initial_h = self.heuristic1(initial_state)
         heapq.heappush(priority_queue, (initial_h, entry_count, initial_state, []))
@@ -163,6 +172,7 @@ class Solver:
                 continue
             visited.add(current_hash)
 
+            #Base case
             if current_game.is_goal_met():
                 self.best_moves = move_sequence
                 return self.best_moves
@@ -180,6 +190,8 @@ class Solver:
                 new_h = self.heuristic1(new_game)
                 new_hash = self.hash_game_state(new_game)
 
+                self.iteration += 1
+                
                 if new_hash not in visited:
                     heapq.heappush(priority_queue, (new_h, entry_count, new_game, move_sequence + [move]))
                     entry_count += 1
@@ -1004,18 +1016,22 @@ while running:
                             start = time.time()
                             best_moves = solver.find_best_moves_bfs()
                             end = time.time()
+                            print("Time BFS:",end - start)
                         elif i == 1:  # DFS
                             start = time.time()
                             best_moves = solver.find_best_moves()
                             end = time.time()
+                            print("Time DFS:",end - start)
                         elif i == 2:  # A*
                             start = time.time()
                             best_moves = solver.a_star()
                             end = time.time()
+                            print("Time A*:",end - start)
                         elif i == 3:  # Greedy
                             start = time.time()
                             best_moves = solver.greedy()
                             end = time.time()
+                            print("Time Greedy:",end - start)
                         elif i == 4:  # Hint
                             # Implement hint logic
                             pass
@@ -1025,7 +1041,9 @@ while running:
                         ui.draw_hand(selected)
                         ui.make_board()
                         timetext = font.render(f"Time: {end - start:.5f}", True, TEXT_COLOR)
+                        iterationtext = font.render(f"Iterations: {solver.iteration}", True, TEXT_COLOR)
                         screen.blit(timetext, (16, 250))
+                        screen.blit(iterationtext, (16, 300))
                         pygame.display.flip()
                         
                         
@@ -1041,12 +1059,12 @@ while running:
                 y = (mouse[1]-100) // BLOCKSIZE
                 if selected != 0:
                     try: 
-                        print("teste")
+                        # print("teste")
                         piece = copy.deepcopy(game.hand.pieces[selected-1])
                         game_teste = copy.deepcopy(game)
                         game_teste.board.place_piece(int(y), int(x), piece)
                     except (IndexError, ValueError):
-                        print("ola")
+                        print("Invalid Position")
                     else:
                         game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
                         ui.make_board()
