@@ -518,6 +518,14 @@ class Board:
                 self.goal.pop_color(color, total_popped)
 
 
+    def is_board_full(self):
+        for row in self.grid:
+            for cell in row:
+                if cell is None:    # Se alguma célula estiver vazia, board não está cheio
+                    return False
+        return True                 # Se não for encontrado nenhum espaço vazio, board está cheio
+
+
     # Retorna uma representação do tabuleiro como uma string
     def __str__(self):
         board_str = ""
@@ -678,6 +686,16 @@ class Game:
     # verifica se o objetivo foi atingido
     def is_goal_met(self):
         return self.goal.is_goal_met()
+    
+
+
+    def check_game_over(self):
+        if self.board.is_board_full():  # Jogador perde se não tiver espaço para jogar
+            print("Game Over! You ran out of space to play!")
+            return True
+        return False
+    
+
     
     # Retorna uma representação do jogo como uma string
     def __str__(self):
@@ -984,6 +1002,14 @@ while running:
         pygame.display.flip()
         pygame.time.delay(10000)
         running = False
+    if game.board.is_board_full():
+        screen.fill("purple")
+        font = pygame.font.SysFont(None, 36)
+        game_over_text = font.render("GAME OVER! You ran out of space in the board!", True, (255, 255, 255))
+        screen.blit(game_over_text, (WIDTH / 2 - 150, HEIGHT / 2))
+        pygame.display.flip()
+        pygame.time.delay(5000)
+        running = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -1050,6 +1076,7 @@ while running:
                         game.refill_hand()
                         ui.make_board()
                     finally:
+                        print(game)
                         selected = 0
                         # game.board.pop_clusters()
                         # screen.fill("purple")

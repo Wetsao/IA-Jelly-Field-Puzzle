@@ -11,9 +11,9 @@ class gui:
 
     def drawlil(self,screen, a, y, x):
         for i in range(4):
-            if(i == 0 or i == 3):
+            if(i == 0 or i == 2):
                 dist = 0
-            if(i == 1 or i ==2):
+            if(i == 1 or i ==3):
                 dist= self.LILBLOCK
             if(i == 0 or i == 1):
                 dist2 = 0
