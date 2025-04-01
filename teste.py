@@ -518,6 +518,22 @@ class Board:
                 self.goal.pop_color(color, total_popped)
 
 
+    def pop_clusters_ui(self, ui):
+        while True:
+          
+            clusters = self.find_clusters()
+            if not clusters:
+                break
+            for color, cluster in clusters:
+                total_popped = 0
+                for (row, col, q) in cluster:
+                    total_popped += self.pop_color_at2(row, col, q, color)
+                self.goal.pop_color(color, total_popped) 
+            ui.make_board()
+            pygame.display.flip()
+            pygame.time.delay(1000)
+
+
     # Retorna uma representação do tabuleiro como uma string
     def __str__(self):
         board_str = ""
@@ -688,12 +704,15 @@ class Game:
 
 
 
-
 # LEVELS
 def level_1():
+
+    boardpieces = [
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+    ]
+
     # Create pieces with a single color
     pieces = [
-        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.RED, Color.RED),
         Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
@@ -711,27 +730,28 @@ def level_1():
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
     ]
 
-    goal = Goal(blue=16, green=16, red=16, yellow=16)
+    goal = Goal(blue=8, green=8, red=8, yellow=8)
 
-    hand = Hand(max_pieces=2)
+    hand = Hand(max_pieces=1)
 
     queue = Queue(pieces)
 
-    game = Game(4, 4, goal, hand, queue)
+    game = Game(3, 3, goal, hand, queue)
 
-    game.place_piece(0, 2, 0)  # Place first piece at (0, 0)
-    game.place_piece(2, 1, 1)  # Place second piece at (0, 1)
-   
-
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
     return game
 
 
 def level_2():
-    pieces = [
+
+    boardpieces = [
         Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
         Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
         Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+    ]
+
+    pieces = [
         Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
         Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
         Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
@@ -750,27 +770,26 @@ def level_2():
         Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED)  
     ]
 
-    goal = Goal(blue=20, green=20, red=20, yellow=20)
+    goal = Goal(blue=10, green=8, red=10, yellow=8)
 
-    hand = Hand(max_pieces=3)
+    hand = Hand(max_pieces=1)
 
     queue = Queue(pieces)
 
-    game = Game(5, 5, goal, hand, queue)
+    game = Game(4, 4, goal, hand, queue)
 
-    game.place_piece(0, 0, 0)  # Place first piece at (0, 0)
-    game.place_piece(1, 2, 1)  # Place second piece at (0, 1)
-    game.place_piece(0, 4, 2)  # Place third piece at (0, 2)
-    game.place_piece(3, 3, 0)  # Place fourth piece at (0, 3)
-    game.place_piece(4, 1, 1)  # Place fifth piece at (0, 4)
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
+    game.board.place_piece(2, 2, boardpieces[1])  # Place second piece at (2,2)
+    game.board.place_piece(0, 3, boardpieces[2])  # Place third piece at (0,3)
+    game.board.place_piece(3, 0, boardpieces[3])  # Place fourth piece at (3,0)
     
-
 
     return game
 
 
 def level_3():
-    pieces = [
+
+    boardpieces = [
         Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
         Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
         Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
@@ -779,6 +798,9 @@ def level_3():
         Piece(Color.RED, Color.RED, Color.RED, Color.RED),
         Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
         Piece(Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW),
+    ]
+
+    pieces = [
         Piece(Color.GREEN, Color.YELLOW, Color.RED, Color.BLUE),
         Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
         Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
@@ -802,41 +824,26 @@ def level_3():
     ]
 
 
-    goal = Goal(blue=30, green=30, red=30, yellow=30)
+    goal = Goal(blue=12, green=12, red=12, yellow=12)
 
-    hand = Hand(max_pieces=4)
+    hand = Hand(max_pieces=2)
 
     queue = Queue(pieces)
 
-    game = Game(6, 6, goal, hand, queue)
+    game = Game(4, 4, goal, hand, queue)
 
-    piece_index = 0
-    for row in range(6):
-        for col in range(6):
-            if (row + col) % 2 == 0:  # Chess-like pattern: alternate placement
-                game.place_piece(row, col, piece_index % len(hand.pieces))
-                piece_index += 1
+    game.board.place_piece(0, 0, boardpieces[0])  # Place first piece at (0,0)
+    game.board.place_piece(0, 2, boardpieces[1])  # Place second piece at (0,2)
+    game.board.place_piece(1, 1, boardpieces[2])  # Place third piece at (1,1)
+    game.board.place_piece(1, 3, boardpieces[3])  # Place fourth piece at (1,3)
+    game.board.place_piece(2, 0, boardpieces[4])  # Place fifth piece at (2,0)
+    game.board.place_piece(2, 2, boardpieces[5])  # Place sixth piece at (2,2)
+    game.board.place_piece(3, 1, boardpieces[6])  # Place seventh piece at (3,1)
+    game.board.place_piece(3, 3, boardpieces[7])  # Place eighth piece at (3,3)
 
     return game
 
 
-
-
-
-# print("Choose your level")
-# print("level 1 4x4")
-# print("level 2 5x5")
-# print("level 3 6x6")
-# n_game = input()
-
-# if n_game == '1':
-#     game = level_1()
-# elif n_game == '2':
-#     game = level_2()
-# elif n_game == '3':
-#     game = level_3()    
-
-# print(game)
 
 # UI--- START
 
@@ -1038,23 +1045,20 @@ while running:
                         piece = copy.deepcopy(game.hand.pieces[selected-1])
                         game_teste = copy.deepcopy(game)
                         game_teste.board.place_piece(int(y), int(x), piece)
-                        # selected= 0
-                        # ui.draw_hand(selected)
-                        # ui.draw_goal()
                     except (IndexError, ValueError):
                         print("ola")
                     else:
                         game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
-                        game.board.pop_clusters()
-                        screen.fill("purple")
+                        ui.make_board()
                         game.refill_hand()
+                        ui.draw_hand(0)
+                        pygame.display.flip()
+                        pygame.time.delay(1000)
+                        game.board.pop_clusters_ui(ui)
+                        screen.fill("purple")
                         ui.make_board()
                     finally:
                         selected = 0
-                        # game.board.pop_clusters()
-                        # screen.fill("purple")
-                        # game.refill_hand()
-                        # ui.make_board()
                         ui.draw_hand(selected)
                         ui.draw_goal()
             elif(game.hand.max_pieces == 1):
@@ -1082,45 +1086,3 @@ while running:
     pygame.display.flip()
 
 pygame.quit()
-
-# Usage example:
-
-
-while True:
-    print("What algorithm do you want to test?")
-    print("1.DFS")
-    print("2.BFS")
-    print("3.A*")
-    print("4.greedy")
-    n_algorithm = input()
-    print("\n")
-
-    if n_algorithm == '1':
-        start = time.time()
-        best_moves = solver.find_best_moves()
-        end = time.time()
-    elif n_algorithm == '2':
-        start = time.time()
-        best_moves = solver.find_best_moves_bfs()
-        end = time.time()
-    elif n_algorithm == '3':
-        start = time.time()
-        best_moves = solver.a_star()
-        end = time.time()
-    elif n_algorithm == '4':
-        start = time.time()
-        best_moves = solver.greedy()
-        end = time.time()
-
-    print("Best Move Sequence:", best_moves)
-
-    if n_algorithm == '1':
-        print("Time DFS:",end - start)
-    elif n_algorithm == '2':
-        print("Time BFS:",end - start)
-    elif n_algorithm == '3':
-        print("Time A*:", end - start)
-    elif n_algorithm == '4':
-        print("Time Greedy:", end - start)
-
-    print("\n")
