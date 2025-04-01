@@ -1,4 +1,223 @@
 from collections import deque
+import heapq
+import time
+import threading
+import tracemalloc
+import copy
+import pygame
+from ui_module import gui
+
+class Solver:
+    def __init__(self, game):
+        self.game = game
+        self.best_moves = []
+        self.number_moves = float('+inf')
+        iteration = 0
+
+    # cria um hash com informaçao do state da board(board, hand, goal) para depois comparar se o state ja foi visitado ou nao
+    def hash_game_state(self, game):
+        board_str = str(game.board.grid)  
+        hand_str = str([str(p) for p in game.hand.pieces])
+        goal_str = str(game.goal.goal)
+        # queue_str = str([str(p) for p in game.queue.pieces]) 
+        return hash(board_str + hand_str + goal_str )
+    
+    # Implementaçao Depth-first search para resoluçao do jogo
+    def dfs(self, game_state, move_sequence, depth):
+        if depth == 0 or game_state.is_goal_met():
+            if len(move_sequence)<self.number_moves and game_state.is_goal_met():
+                self.number_moves = len(move_sequence)
+                self.best_moves = move_sequence[:]
+                # if game_state.is_goal_met() == True:
+                #     print("Goal met")
+                #     print(self.best_moves)
+            return
+        
+        for row in range(game_state.board.rows):
+            for col in range(game_state.board.cols):
+                for hand_index in range(len(game_state.hand.pieces)):
+                    new_game_state = copy.deepcopy(game_state)
+                    piece = new_game_state.hand.get_piece(hand_index)
+                    if piece:
+                        try:
+                            new_game_state.board.place_piece(row, col, piece)
+                            new_game_state.board.pop_clusters()
+                            new_game_state.refill_hand()
+                            move_sequence.append((row, col, hand_index))
+                            self.iteration += 1
+                            self.dfs(new_game_state, move_sequence, depth - 1)
+                            move_sequence.pop()
+                        except (IndexError, ValueError):
+                            continue
+    
+    # Inicializaçao do DFS
+    # Retorna lista com melhor sucessao de jogadas até ao objetivo
+    def find_best_moves(self, max_depth=6):
+        self.iteration = 0
+        self.dfs(self.game, [], max_depth)
+        return self.best_moves
+    
+
+    # Implementaçao Breadth-first search para resoluçao do jogo
+    def bfs(self, game):
+        visited = set()
+        queu = deque()
+        queu.append((game, []))
+        while queu:
+            game, move_sequence = queu.popleft()
+            # if(len(move_sequence) == 1):
+            #     print(move_sequence, game.is_goal_met())
+            #     # print(game)
+
+            current_hash = self.hash_game_state(game)
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
+            # Caso base
+            if(game.is_goal_met()):
+                self.best_moves = move_sequence
+                return
+            
+            # Percorre as possiveis jogadas criando novo estado por cada jogada
+            for move in self.possible_moves(game):  
+                new_game = copy.deepcopy(game)
+                piece = new_game.hand.get_piece(move[2])
+                new_game.board.place_piece(move[0],move[1], piece)
+                new_game.board.pop_clusters()
+                new_game.refill_hand()
+                
+                state_hash = self.hash_game_state(new_game)
+                self.iteration += 1
+                if state_hash not in visited:
+                    new_sequence = move_sequence + [move] 
+                    queu.append((new_game, new_sequence))
+
+    # Retorna lista com jogadas possiveis mediante o estado onde foi invocado
+    def possible_moves(self, game):
+        possible_moves = []
+        for row in range(game.board.rows):
+            for cols in range(game.board.cols):
+                for hand in range(len(game.hand.pieces)):
+                    new_game = copy.deepcopy(game)
+                    piece = new_game.hand.get_piece(hand)
+                    if piece:
+                        try:
+                            new_game.board.place_piece(row, cols, piece)
+                            possible_moves.append((row,cols,hand))
+                        except (IndexError, ValueError):
+                            continue 
+        return possible_moves
+    
+    # Inicializaçao do BFS
+    # Retorna lista com melhor sucessao de jogadas até ao objetivo
+    def find_best_moves_bfs(self):
+        self.iteration = 0
+        self.bfs(self.game)
+        return self.best_moves
+    
+
+    # Implementaçao A* algorithm para resoluçao do jogo
+    def a_star(self):
+        visited = {} 
+        priority_queue = []
+        entry_count = 0
+        self.iteration = 0
+        initial_state = copy.deepcopy(self.game)
+        initial_g = 0
+        initial_h = self.heuristic2(initial_state)
+        heapq.heappush(priority_queue, (initial_g + initial_h, entry_count, initial_state, []))
+        entry_count += 1
+
+        while priority_queue:
+            f, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
+
+            # print(move_sequence, game.is_goal_met())
+            # print(game)
+
+            if current_hash in visited and visited[current_hash] <= f:
+                continue
+            visited[current_hash] = f
+
+            #Base case
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece) 
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_g = len(move_sequence) + 1  
+                new_h = self.heuristic2(new_game)
+                new_f = new_g + new_h
+                new_hash = self.hash_game_state(new_game)
+                
+                self.iteration += 1
+
+                if new_hash not in visited or new_f < visited.get(new_hash, float('+inf')):
+                    heapq.heappush(priority_queue, (new_f, entry_count, new_game, move_sequence + [move]))  
+                    entry_count += 1
+
+
+    # Implementaçao Greedy search para resoluçao do jogo
+    def greedy(self):
+        visited = set()
+        priority_queue = []
+        entry_count = 0
+        self.iteration = 0
+        initial_state = copy.deepcopy(self.game)
+        initial_h = self.heuristic1(initial_state)
+        heapq.heappush(priority_queue, (initial_h, entry_count, initial_state, []))
+        entry_count += 1
+
+        while priority_queue:
+            h, _, current_game, move_sequence = heapq.heappop(priority_queue)
+            current_hash = self.hash_game_state(current_game)
+
+            if current_hash in visited:
+                continue
+            visited.add(current_hash)
+
+            #Base case
+            if current_game.is_goal_met():
+                self.best_moves = move_sequence
+                return self.best_moves
+
+            for move in self.possible_moves(current_game):
+                new_game = copy.deepcopy(current_game)
+                piece = new_game.hand.get_piece(move[2])
+                try:
+                    new_game.board.place_piece(move[0], move[1], piece)
+                    new_game.board.pop_clusters()
+                    new_game.refill_hand()
+                except (IndexError, ValueError):
+                    continue
+
+                new_h = self.heuristic1(new_game)
+                new_hash = self.hash_game_state(new_game)
+
+                self.iteration += 1
+                
+                if new_hash not in visited:
+                    heapq.heappush(priority_queue, (new_h, entry_count, new_game, move_sequence + [move]))
+                    entry_count += 1
+
+    # Heuristica simples calcula soma total do objetivo
+    def heuristic1(self, game):
+        return game.goal.goal_sum() 
+        
+    # Heuristica assume que qualquer move elimina o maximo de cores possiveis
+    def heuristic2(self, game):
+        total_remaining = game.goal.goal_sum()
+        return (total_remaining + 3) // 4  
 
 
 
@@ -17,6 +236,7 @@ class Piece:
     def __init__(self, c1, c2, c3, c4):
         self.colors = [c1, c2, c3, c4]
 
+    # Retorna lista de quantidades de cores da peça
     def get_colors(self):
         return self.colors
 
@@ -27,6 +247,53 @@ class Piece:
         self.colors = [Color.NULL if c == color else c for c in self.colors]
         self.fill_nulls()
         return count
+    
+    # Remove as ocorrencias de uma cor na peça desde que estas ocorrencias sejam adjacentes e preenche os espaços vazios
+    # Retorna o número de ocorrências da cor removida
+    def pop_connected(self, pos, color):        
+        popped_indices = set()
+    
+        adjacency = {
+            0: [1, 2],  # Top-Left → Top-Right, Bottom-Left
+            1: [0, 3],  # Top-Right → Top-Left, Bottom-Right
+            2: [0, 3],  # Bottom-Left → Top-Left, Bottom-Right
+            3: [1, 2]   # Bottom-Right → Top-Right, Bottom-Left
+        }
+        
+        for start_index in range(4):
+            if self.colors[start_index] != color or start_index in popped_indices:
+                continue
+            
+            stack = [start_index]
+            cluster = []
+            
+            while stack:
+                current = stack.pop()
+                if current in popped_indices or self.colors[current] != color:
+                    continue
+                
+                popped_indices.add(current)
+                cluster.append(current)
+                
+            
+                for neighbor in adjacency[current]:
+                    if neighbor not in popped_indices and self.colors[neighbor] == color:
+                        stack.append(neighbor)
+            
+        
+            # print("pop_color cluster", cluster)
+            # print("pop_color neighbor", neighbor)
+            if len(cluster) >= 2:
+                for idx in cluster: 
+                    self.colors[idx] = Color.NULL
+            if len(cluster) == 1:
+                self.colors[pos] = Color.NULL
+        
+        self.fill_nulls()  # Your existing fill method
+        return len(popped_indices)
+        
+
+        
 
     # Preenche os espaços vazios com cores baseadas nas cores dos vizinhos
     def fill_nulls(self):
@@ -65,7 +332,7 @@ class Piece:
 
         if len(valid_neighbors) == 2 and neighbor_counts[valid_neighbors[0]] == neighbor_counts[valid_neighbors[1]]:
             # Se houver um empate, prioriza o vizinho horizontal
-            if index in [0, 2]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
+            if index in [0, 1]:  # Horizontal neighbors for index 0 and 2 are 1 and 3 respectively
                 return neighbors[0]
             else:  # Horizontal neighbors for index 1 and 3 are 0 and 2 respectively
                 return neighbors[1]
@@ -96,6 +363,8 @@ class Board:
     def place_piece(self, row, col, piece):
         if 0 <= row < self.rows and 0 <= col < self.cols:
             if self.grid[row][col] is None:
+                #new_piece = copy.deepcopy(piece)
+                #self.grid[row][col] = new_piece
                 self.grid[row][col] = piece
             else:
                 raise ValueError("Position already occupied")
@@ -118,86 +387,117 @@ class Board:
                 self.grid[row][col] = None
             return count
         return 0
+    
+    def pop_color_at2(self, row, col, pos, color):
+        piece = self.get_piece(row, col)
+        if piece:
+            count = piece.pop_connected(pos, color)
+            if piece.is_fully_null():
+                self.grid[row][col] = None
+            return count
+        return 0
 
-    # Encontra clusters com a mesma cor e remove-as
+    # Encontra clusters com a mesma cor e associa-os em uma lista com a posiçao das peças que formam o cluster e a posiçao do quadrante dentro da peça
     # Cluster: conjunto de partes de peças adjacentes com a mesma cor
     def find_clusters(self):
         clusters = []
         visited = set()
-
-        # DFS para encontrar clusters
-        def dfs(r, c, color, direction):
-            stack = [(r, c, direction)]
+        
+        def dfs(row, col, quadrant, color):
+            stack = [(row, col, quadrant)]
             cluster = []
             while stack:
-                row, col, direction = stack.pop()
-                if (row, col, direction) not in visited and 0 <= row < self.rows and 0 <= col < self.cols:
-                    piece = self.get_piece(row, col)
-                    if piece and color in piece.get_colors():
-                        visited.add((row, col, direction))
-                        cluster.append((row, col))
-                        # Check adjacent cells based on direction
-                        if direction == "top-left":
-                            if row > 0 and piece.colors[0] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[2] == color:
-                                    stack.append((row - 1, col, "bottom-left"))
-                            if col > 0 and piece.colors[0] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[1] == color:
-                                    stack.append((row, col - 1, "top-right"))
-                        if direction == "top-right":
-                            if row > 0 and piece.colors[1] == color:  # Top
-                                top_piece = self.get_piece(row - 1, col)
-                                if top_piece and top_piece.colors[3] == color:
-                                    stack.append((row - 1, col, "bottom-right"))
-                            if col < self.cols - 1 and piece.colors[1] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[0] == color:
-                                    stack.append((row, col + 1, "top-left"))
-                        if direction == "bottom-left":
-                            if row < self.rows - 1 and piece.colors[2] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[0] == color:
-                                    stack.append((row + 1, col, "top-left"))
-                            if col > 0 and piece.colors[2] == color:  # Left
-                                left_piece = self.get_piece(row, col - 1)
-                                if left_piece and left_piece.colors[3] == color:
-                                    stack.append((row, col - 1, "bottom-right"))
-                        if direction == "bottom-right":
-                            if row < self.rows - 1 and piece.colors[3] == color:  # Bottom
-                                bottom_piece = self.get_piece(row + 1, col)
-                                if bottom_piece and bottom_piece.colors[1] == color:
-                                    stack.append((row + 1, col, "top-right"))
-                            if col < self.cols - 1 and piece.colors[3] == color:  # Right
-                                right_piece = self.get_piece(row, col + 1)
-                                if right_piece and right_piece.colors[2] == color:
-                                    stack.append((row, col + 1, "bottom-left"))
+                r, c, q = stack.pop()
+                if (r, c, q) in visited:
+                    continue
+                piece = self.get_piece(r, c)
+                if not piece or piece.colors[q] != color:
+                    continue
+                visited.add((r, c, q))
+                cluster.append((r, c, q))
+                # Check adjacent quadrants in neighboring pieces
+                if q == 0:  # Top-left quadrant
+                    # Check piece above (its bottom-left quadrant, q=2)
+                    if r > 0:
+                        stack.append((r - 1, c, 2))
+                    # Check left piece (its top-right quadrant, q=1)
+                    if c > 0:
+                        stack.append((r, c - 1, 1))
+                elif q == 1:  # Top-right quadrant
+                    # Check piece above (its bottom-right quadrant, q=3)
+                    if r > 0:
+                        stack.append((r - 1, c, 3))
+                    # Check right piece (its top-left quadrant, q=0)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 0))
+                elif q == 2:  # Bottom-left quadrant
+                    # Check piece below (its top-left quadrant, q=0)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 0))
+                    # Check left piece (its bottom-right quadrant, q=3)
+                    if c > 0:
+                        stack.append((r, c - 1, 3))
+                elif q == 3:  # Bottom-right quadrant
+                    # Check piece below (its top-right quadrant, q=1)
+                    if r < self.rows - 1:
+                        stack.append((r + 1, c, 1))
+                    # Check right piece (its bottom-left quadrant, q=2)
+                    if c < self.cols - 1:
+                        stack.append((r, c + 1, 2))
             return cluster
 
         for row in range(self.rows):
             for col in range(self.cols):
                 piece = self.get_piece(row, col)
                 if piece:
-                    for i, color in enumerate(piece.get_colors()):
-                        if color != Color.NULL:
-                            direction = ["top-left", "top-right", "bottom-left", "bottom-right"][i]
-                            cluster = dfs(row, col, color, direction)
-                            if len(cluster) > 1:
+                    for q in range(4):
+                        color = piece.colors[q]
+                        if color != Color.NULL and (row, col, q) not in visited:
+                            cluster = dfs(row, col, q, color)
+                            if len(cluster) >= 2:  # Minimum cluster size
                                 clusters.append((color, cluster))
         return clusters
+        
 
     # Remove clusters e atualiza o goal
     def pop_clusters(self):
         while True:
             clusters = self.find_clusters()
+            # print("clusters:" ,clusters)
+            if not clusters:
+                break
+            for color, cluster in clusters:
+                # print("cluster:", color, cluster)
+                total_popped = 0
+                for (row, col, q) in cluster:
+                    total_popped += self.pop_color_at2(row, col, q, color)
+                self.goal.pop_color(color, total_popped)
+
+    # Remove clusters e atualiza goal e anima clusters a dar pop
+    def pop_clusters_ui(self, ui):
+        while True:
+          
+            clusters = self.find_clusters()
             if not clusters:
                 break
             for color, cluster in clusters:
                 total_popped = 0
-                for row, col in cluster:
-                    total_popped += self.pop_color_at(row, col, color)
-                self.goal.pop_color(color, total_popped)
+                for (row, col, q) in cluster:
+                    total_popped += self.pop_color_at2(row, col, q, color)
+                self.goal.pop_color(color, total_popped) 
+            ui.make_board()
+            pygame.display.flip()
+            pygame.time.delay(1000)
+
+    # Checks if board is full and moves arent possible
+    def is_board_full(self):
+        for row in self.grid:
+            for cell in row:
+                if cell is None:    # Se alguma célula estiver vazia, board não está cheio
+                    return False
+        return True                 # Se não for encontrado nenhum espaço vazio, board está cheio
+ 
+ 
 
     # Retorna uma representação do tabuleiro como uma string
     def __str__(self):
@@ -240,6 +540,10 @@ class Goal:
     # Retorna True se o objetivo for atingido
     def is_goal_met(self):
         return all(count == 0 for count in self.goal.values())
+
+    # Retorna numero total do objetivo
+    def goal_sum(self):
+        return sum(self.goal.values())
 
     # Retorna uma representação do objetivo como uma string
     def __str__(self):
@@ -290,7 +594,11 @@ class Queue:
     # Remove e retorna a próxima peça da fila
     def draw_piece(self):
         if self.pieces:
-            return self.pieces.popleft()
+            self.piece = self.pieces.popleft()
+            # self.pieces.append(self.piece)
+            piece_copy = copy.deepcopy(self.piece)
+            self.pieces.append(piece_copy)
+            return self.piece
         else:
             return None
 
@@ -318,7 +626,7 @@ class Game:
         self.hand = hand
         self.queue = queue
         self.refill_hand()
-
+        
     # Preenche a mão com peças da fila
     def refill_hand(self):
         while len(self.hand.pieces) < self.hand.max_pieces:
@@ -341,6 +649,13 @@ class Game:
     # verifica se o objetivo foi atingido
     def is_goal_met(self):
         return self.goal.is_goal_met()
+    
+    # Retorna True caso board esteja cheia e nao seja possivel a realizaçao de nenhuma jogada
+    def check_game_over(self):
+         if self.board.is_board_full():  # Jogador perde se não tiver espaço para jogar
+             print("Game Over! You ran out of space to play!")
+             return True
+         return False
 
     # Retorna uma representação do jogo como uma string
     def __str__(self):
@@ -351,43 +666,399 @@ class Game:
 
 
 
+# LEVELS
+def level_1():
+
+    boardpieces = [
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+    ]
+
+    # Create pieces with a single color
+    pieces = [
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+    ]
+
+    goal = Goal(blue=8, green=8, red=8, yellow=8)
+
+    hand = Hand(max_pieces=1)
+
+    queue = Queue(pieces)
+
+    game = Game(3, 3, goal, hand, queue)
+
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
+    return game
+
+
+def level_2():
+
+    boardpieces = [
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+    ]
+
+    pieces = [
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.BLUE, Color.BLUE, Color.RED, Color.RED),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.RED, Color.BLUE, Color.RED, Color.BLUE),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED)  
+    ]
+
+    goal = Goal(blue=10, green=8, red=10, yellow=8)
+
+    hand = Hand(max_pieces=1)
+
+    queue = Queue(pieces)
+
+    game = Game(4, 4, goal, hand, queue)
+
+    game.board.place_piece(1, 1, boardpieces[0])  # Place first piece at (1,1)
+    game.board.place_piece(2, 2, boardpieces[1])  # Place second piece at (2,2)
+    game.board.place_piece(0, 3, boardpieces[2])  # Place third piece at (0,3)
+    game.board.place_piece(3, 0, boardpieces[3])  # Place fourth piece at (3,0)
+    
+
+    return game
+
+
+def level_3():
+
+    boardpieces = [
+        Piece(Color.YELLOW, Color.GREEN, Color.YELLOW, Color.GREEN),
+        Piece(Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE),
+        Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
+        Piece(Color.RED, Color.RED, Color.RED, Color.RED),
+        Piece(Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW),
+        Piece(Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW),
+    ]
+
+    pieces = [
+        Piece(Color.GREEN, Color.YELLOW, Color.RED, Color.BLUE),
+        Piece(Color.RED, Color.RED, Color.GREEN, Color.GREEN),
+        Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.YELLOW),
+        Piece(Color.YELLOW, Color.GREEN, Color.RED, Color.BLUE),
+        Piece(Color.BLUE, Color.YELLOW, Color.GREEN, Color.RED),
+        Piece(Color.RED, Color.GREEN, Color.YELLOW, Color.BLUE),
+        Piece(Color.RED, Color.BLUE, Color.RED, Color.BLUE),
+        Piece(Color.YELLOW, Color.YELLOW, Color.GREEN, Color.GREEN),
+        Piece(Color.YELLOW, Color.YELLOW, Color.BLUE, Color.BLUE),
+        Piece(Color.BLUE, Color.GREEN, Color.RED, Color.YELLOW),
+        Piece(Color.BLUE, Color.RED, Color.BLUE, Color.RED),
+        Piece(Color.GREEN, Color.RED, Color.BLUE, Color.YELLOW),
+        Piece(Color.BLUE, Color.BLUE, Color.RED, Color.RED),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE),
+        Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
+        Piece(Color.GREEN, Color.GREEN, Color.RED, Color.RED),
+        Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.GREEN),
+        Piece(Color.GREEN, Color.YELLOW, Color.GREEN, Color.YELLOW),
+        Piece(Color.GREEN, Color.YELLOW, Color.BLUE, Color.RED),
+        Piece(Color.RED, Color.RED, Color.BLUE, Color.BLUE)
+    ]
+
+
+    goal = Goal(blue=12, green=12, red=12, yellow=12)
+
+    hand = Hand(max_pieces=2)
+
+    queue = Queue(pieces)
+
+    game = Game(4, 4, goal, hand, queue)
+
+    game.board.place_piece(0, 0, boardpieces[0])  # Place first piece at (0,0)
+    game.board.place_piece(0, 2, boardpieces[1])  # Place second piece at (0,2)
+    game.board.place_piece(1, 1, boardpieces[2])  # Place third piece at (1,1)
+    game.board.place_piece(1, 3, boardpieces[3])  # Place fourth piece at (1,3)
+    game.board.place_piece(2, 0, boardpieces[4])  # Place fifth piece at (2,0)
+    game.board.place_piece(2, 2, boardpieces[5])  # Place sixth piece at (2,2)
+    game.board.place_piece(3, 1, boardpieces[6])  # Place seventh piece at (3,1)
+    game.board.place_piece(3, 3, boardpieces[7])  # Place eighth piece at (3,3)
+
+    return game
 
 
 
+# UI--- START
+
+pygame.init()
+pygame.display.set_caption("Jelly Field")
+WIDTH, HEIGHT = 1000, 900  # Screen size
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+
+# LEVEL SELECTING --------------------
+
+
+BUTTON_WIDTH, BUTTON_HEIGHT = 100, 50
+PADDING = 20  
+
+# Colors
+PURPLE = (128, 0, 128)
+BUTTON_COLOR = (255, 223, 0)  # Bright Yellow
+HOVER_COLOR = (200, 180, 0)   # Slightly darker yellow
+TEXT_COLOR = (0, 0, 0)  # Black
+
+# Number of levels (Change this to any number)
+NUM_LEVELS = 3
+
+
+# Font
+font = pygame.font.Font(None, 36)
+
+# Button positions (dynamically calculated)
+buttons = []
+start_x = (WIDTH - ((NUM_LEVELS * BUTTON_WIDTH) + (NUM_LEVELS - 1) * PADDING)) // 2
+start_y = (HEIGHT / 2)- (BUTTON_HEIGHT / 2)  # Positioning at the top
+
+for i in range(NUM_LEVELS):
+    x = start_x + i * (BUTTON_WIDTH + PADDING)
+    y = start_y
+    buttons.append(pygame.Rect(x, y, BUTTON_WIDTH, BUTTON_HEIGHT))
+
+# Game loop
+selecting_level = True
+while selecting_level:
+    screen.fill("purple")  # Set background color
+
+    # Get mouse position
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
+    # Draw buttons
+    for i, button in enumerate(buttons):
+        # Check if mouse is hovering
+        if button.collidepoint(mouse_x, mouse_y):
+            color = HOVER_COLOR
+        else:
+            color = BUTTON_COLOR
+
+        # Draw button
+        pygame.draw.rect(screen, color, button, border_radius=10)
+
+        # Draw button text
+        text = font.render(f"Level {i + 1}", True, TEXT_COLOR)
+        text_rect = text.get_rect(center=button.center)
+        screen.blit(text, text_rect)
+
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            selecting_level = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            for i, button in enumerate(buttons):
+                if button.collidepoint(event.pos):
+                    print(f"Selected Level {i + 1}")  # Print selected level
+                    n = i+1
+                    if(n== 1):
+                        game = level_1()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+                    elif(n==2):
+                        game = level_2()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+                    elif(n==3):
+                        game = level_3()
+                        screen.fill("purple")
+                        pygame.display.flip()
+                        selecting_level = False
+
+    pygame.display.flip()
+
+
+# ACTUAL LEVEL DRAWING AND GAMELOOP --------
+
+BLOCKSIZE = (screen.get_width() - 500) / game.board.cols
+LILBLOCK = BLOCKSIZE / 2
+gamesize = BLOCKSIZE * game.board.cols
+selected = 0
+
+            
+
+ui = gui(game, screen,BLOCKSIZE, gamesize)
 
 
 
-
-# Example usage
-pieces = [
-    #Piece(Color.BLUE, Color.RED, Color.BLUE, Color.BLUE),
-    Piece(Color.BLUE, Color.RED, Color.BLUE, Color.YELLOW),
-    Piece(Color.RED, Color.BLUE, Color.YELLOW, Color.BLUE),
-    Piece(Color.YELLOW, Color.RED, Color.GREEN, Color.BLUE),
-    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.GREEN),
-    Piece(Color.GREEN, Color.BLUE, Color.YELLOW, Color.RED),
-    Piece(Color.RED, Color.YELLOW, Color.BLUE, Color.YELLOW),
-    Piece(Color.YELLOW, Color.BLUE, Color.RED, Color.GREEN),
-    Piece(Color.GREEN, Color.GREEN, Color.YELLOW, Color.BLUE),
-]
-
-goal = Goal(blue=20, green=20, red=20, yellow=20)
-hand = Hand(max_pieces=2)
-queue = Queue(pieces)
-game = Game(3, 3, goal, hand, queue)
-
-# Place pieces on the board
-game.place_piece(0, 0, 0)  
-game.place_piece(0, 1, 1)  
-game.place_piece(1, 0, 1)  
-
-
-
-
-# PARA VER O TABULEIRO ANTES E DEPOIS DO POP, COMENTAR LINHA 336 E DESCOMENTAR AS LINHAS SEGUINTES:
-#print("Before popping:")
-#print(game)
-#game.board.pop_clusters()
-
-print("\nAfter popping clusters:")
+ui.make_board()
+ui.draw_hand(selected)
+ui.draw_goal()
 print(game)
+running = True
+searchButtons = []
+searchButtons.append(pygame.Rect(16, 100, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(132, 100, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(16, 116 +BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(132, 116 +BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT))
+searchButtons.append(pygame.Rect(766, 350, BUTTON_WIDTH*2 +16, BUTTON_HEIGHT))
+searchNames = []
+searchNames.append("BFS")
+searchNames.append("DFS")
+searchNames.append("A*")
+searchNames.append("Greedy")
+searchNames.append("Hint")
+
+
+
+while running:
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    for i, searchbutton in enumerate(searchButtons):
+        
+        if searchbutton.collidepoint(mouse_x, mouse_y):
+            color = HOVER_COLOR
+        else:
+            color = BUTTON_COLOR
+
+        # Draw button
+        pygame.draw.rect(screen, color, searchbutton, border_radius=10)
+
+        # Draw button text
+        text = font.render(searchNames[i], True, TEXT_COLOR)
+        text_rect = text.get_rect(center=searchbutton.center)
+        screen.blit(text, text_rect)
+    if(game.board.goal.is_goal_met()):
+        screen.fill("purple")
+        font = pygame.font.SysFont(None, 36)
+        vic_text = font.render("VICTORY!", True, (255, 255, 255))
+        screen.blit(vic_text, (WIDTH/2, HEIGHT/2))
+        pygame.display.flip()
+        pygame.time.delay(10000)
+        running = False
+    if(game.board.is_board_full()):
+         screen.fill("purple")
+         font = pygame.font.SysFont(None, 36)
+         game_over_text = font.render("GAME OVER! You ran out of space in the board!", True, (255, 255, 255))
+         screen.blit(game_over_text, (WIDTH / 2 - 150, HEIGHT / 2))
+         pygame.display.flip()
+         pygame.time.delay(5000)
+         running = False
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            break
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            for i, searchbutton in enumerate(searchButtons):
+                if searchbutton.collidepoint(event.pos):
+                    def run_solver():
+                        solver = Solver(game)
+                        if i == 0:  # BFS
+                            start = time.time()
+                            best_moves = solver.find_best_moves_bfs()
+                            end = time.time()
+                            print("Time BFS:",end - start)
+                        elif i == 1:  # DFS
+                            start = time.time()
+                            best_moves = solver.find_best_moves()
+                            end = time.time()
+                            print("Time DFS:",end - start)
+                        elif i == 2:  # A*
+                            start = time.time()
+                            best_moves = solver.a_star()
+                            end = time.time()
+                            print("Time A*:",end - start)
+                        elif i == 3:  # Greedy
+                            start = time.time()
+                            best_moves = solver.greedy()
+                            end = time.time()
+                            print("Time Greedy:",end - start)
+                        elif i == 4:  # Hint
+                            # Implement hint logic
+                            pass
+                        print(f"Solver finished with moves: {best_moves}")
+                        screen.fill("purple")
+                        ui.draw_goal()
+                        ui.draw_hand(selected)
+                        ui.make_board()
+                        timetext = font.render(f"Time: {end - start:.5f}", True, TEXT_COLOR)
+                        iterationtext = font.render(f"Iterations: {solver.iteration}", True, TEXT_COLOR)
+                        screen.blit(timetext, (16, 250))
+                        screen.blit(iterationtext, (16, 300))
+                        pygame.display.flip()
+                        
+                        
+                    solver_thread = threading.Thread(target=run_solver)
+                    solver_thread.daemon = True  
+                    solver_thread.start()
+                    
+            mouse = pygame.mouse.get_pos()
+            print(mouse)
+            if((250<=mouse[0]<=250+gamesize) and (100<= mouse[1]<= (100+ (BLOCKSIZE*game.board.rows)))):
+                print("(" , (mouse[0]-250) // BLOCKSIZE , "," , (mouse[1]-100) // BLOCKSIZE , ")")
+                x = (mouse[0]-250) // BLOCKSIZE
+                y = (mouse[1]-100) // BLOCKSIZE
+                if selected != 0:
+                    try: 
+                        # print("teste")
+                        piece = copy.deepcopy(game.hand.pieces[selected-1])
+                        game_teste = copy.deepcopy(game)
+                        game_teste.board.place_piece(int(y), int(x), piece)
+                    except (IndexError, ValueError):
+                        print("Invalid Position")
+                    else:
+                        game.board.place_piece(int(y), int(x), game.hand.get_piece(selected-1))
+                        ui.make_board()
+                        game.refill_hand()
+                        ui.draw_hand(0)
+                        pygame.display.flip()
+                        pygame.time.delay(1000)
+                        game.board.pop_clusters_ui(ui)
+                        screen.fill("purple")
+                        ui.make_board()
+                    finally:
+                        selected = 0
+                        ui.draw_hand(selected)
+                        ui.draw_goal()
+            elif(game.hand.max_pieces == 1):
+                if((WIDTH/2)-LILBLOCK-20<=mouse[0]<=(WIDTH/2)+LILBLOCK+20 and 640 <= mouse[1]<= 825):
+                    selected = 1
+                    ui.draw_hand(selected)
+                else:
+                    selected = 0
+                    ui.draw_hand(selected)
+            elif(game.hand.max_pieces == 2):
+                if((WIDTH/2)-25-BLOCKSIZE-20 <=mouse[0] <= (WIDTH/2)-25+20 and 640 <= mouse[1]<= 825):
+                    print("selected= 1")
+                    selected = 1
+                    ui.draw_hand(selected)
+                elif((WIDTH/2)+25-20 <= mouse[0]<= (WIDTH/2)+25+BLOCKSIZE+20 and 640 <= mouse[1]<= 825):
+                    print("selected = 2")
+                    selected= 2
+                    ui.draw_hand(selected)
+                else:
+                    selected = 0
+                    ui.draw_hand(selected)
+
+
+    
+    pygame.display.flip()
+
+pygame.quit()
