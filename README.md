@@ -11,7 +11,7 @@ pip install pygame
 
 ```
 python -m venv venv
-#or
+# or
 python3 -m venv venv
 ```
 
@@ -27,6 +27,6 @@ source venv/bin/activate
 
 ```
 python game.py
-#or
+# or
 python3 game.py
 ```
