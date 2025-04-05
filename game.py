@@ -210,6 +210,25 @@ class Solver:
                     heapq.heappush(priority_queue, (new_h, entry_count, new_game, move_sequence + [move]))
                     entry_count += 1
 
+    def one_iteration_greedy(self):
+        maxpop = 0
+        goal = self.game.goal.goal_sum()
+        for move in self.possible_moves(self.game):
+            new_game = copy.deepcopy(self.game)
+            piece = new_game.hand.get_piece(move[2])
+            try:
+                new_game.board.place_piece(move[0], move[1], piece)
+                new_game.board.pop_clusters()
+                new_game.refill_hand()
+            except (IndexError, ValueError):
+                continue
+            score = goal - new_game.goal.goal_sum()
+            if(score >= maxpop):
+                maxpop = score
+                best_move = move
+        self.best_moves.append(best_move)
+        return self.best_moves
+
     # Heuristica simples calcula soma total do objetivo
     def heuristic1(self, game):
         return game.goal.goal_sum() 
@@ -970,6 +989,7 @@ while running:
                 if searchbutton.collidepoint(event.pos):
                     def run_solver():
                         solver = Solver(game)
+                        hinttext = font.render("", True, TEXT_COLOR)
                         if i == 0:  # BFS
                             start = time.time()
                             best_moves = solver.find_best_moves_bfs()
@@ -991,7 +1011,11 @@ while running:
                             end = time.time()
                             print("Time Greedy:",end - start)
                         elif i == 4:  # Hint
-                            # Implement hint logic
+                            start = time.time()
+                            best_moves = solver.one_iteration_greedy()
+                            solver.iteration = 1
+                            end = time.time()
+                            hinttext = font.render(str(best_moves), True, TEXT_COLOR)
                             pass
                         print(f"Solver finished with moves: {best_moves}")
                         screen.fill("purple")
@@ -1000,8 +1024,9 @@ while running:
                         ui.make_board()
                         timetext = font.render(f"Time: {end - start:.5f}", True, TEXT_COLOR)
                         iterationtext = font.render(f"Iterations: {solver.iteration}", True, TEXT_COLOR)
-                        screen.blit(timetext, (16, 250))
                         screen.blit(iterationtext, (16, 300))
+                        screen.blit(hinttext, (766, 400))
+                        screen.blit(timetext, (16, 250))
                         pygame.display.flip()
                         
                         
