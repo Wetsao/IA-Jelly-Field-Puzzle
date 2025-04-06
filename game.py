@@ -2,7 +2,6 @@ from collections import deque
 import heapq
 import time
 import threading
-import tracemalloc
 import copy
 import pygame
 from ui_module import gui
